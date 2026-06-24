@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+requests
+beautifulsoup4
+playwright
+pdfminer.six
+spacy
+sentence-transformers
+scikit-learn
+shap
+sqlalchemy
+psycopg2-binary
+python-dotenv
+supabase
+pytest
