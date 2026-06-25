@@ -25,36 +25,51 @@ def scrape_jora(query, location):
     # Loop through all cards to get return data
     job_cards = soup.find_all("div", class_="job-card")
     
+    jobs = []
     # Return job info
     for card in job_cards:
+        title = ""
+        badge_list = []
+        url = ""
+        
         h2 = card.find("h2")
         if h2:
             a = h2.find("a")
             if a:
-                print(a.text.strip())
+                title = a.text.strip()
+                url = "https://au.jora.com" + a.get("href") 
 
 # Company name        
         company = card.find("span", class_ = "job-company")
-        if company:
-            print (company.text.strip())
 
 # Location
         location = card.find("a", class_ = "job-location")
-        if location:
-            print (location.text.strip())
 
 # Employment type
         badges_div = card.find("div", class_ = "badges")
         if badges_div:
             badges = badges_div.find_all("div", class_ = "content")
             badge_list = [b.text.strip() for b in badges]
-            print(badge_list)
 
-        
+# Job posted date
+        posted_date = card.find("span", class_ = "job-listed-date")
 
-        
+        job = {
+            "title": title,
+            "company": company.text.strip() if company else "",
+            "location": location.text.strip() if location else "",
+            "badges": badge_list,
+            "posted_at": posted_date.text.strip() if posted_date else "",
+            "url": url,
+            
+        }
+        jobs.append(job)
 
-scrape_jora("data analyst", "sydney")
+    return jobs
+ 
+
+jobs = scrape_jora("data analyst", "sydney")
+print (jobs)
 
 
     

@@ -1,0 +1,15 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables (passwords, API keys)
+.env
+
+# Python virtual environment
+venv/
+.venv/
+
+# Frontend dependencies
+node_modules/
+.next/
+.env.local
