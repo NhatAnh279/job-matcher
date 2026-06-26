@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+import json
 
 # Scrape using full user agent
 def scrape_jora(query, location):
@@ -135,10 +136,15 @@ def scrape_jora(query, location, pages=3):
             
 
     
- 
-
 jobs = scrape_jora("data analyst", "sydney")
 print (len(jobs))
 
+# JSON 
+jobs = scrape_jora("data analyst", "sydney")
+
+with open("backend/app/data/jobs.json", "w") as f:
+    json.dump(jobs, f)
+
+print(f"Saved {len(jobs)} jobs")
 
     
