@@ -6,13 +6,94 @@
    Per-section accents are passed in via inline style where needed.
    ════════════════════════════════════════════════════════════════ */
 
+/* ════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — single source of truth. Components read these vars;
+   no scattered magic values. Per-page accent swaps via .accent-* below.
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  /* neutrals */
+  --bg: #FAFAFB;
+  --surface: #FFFFFF;
+  --ink: #16181D;
+  --muted: #6B7280;
+  --hairline: rgba(0, 0, 0, 0.08);
+
+  /* per-page accent (default = near-black "Home"); pages override via .accent-* */
+  --accent: #16181D;
+  --accent-rgb: 22, 24, 29;
+  --accent-soft: rgba(var(--accent-rgb), 0.10);
+  --accent-line: rgba(var(--accent-rgb), 0.35);
+
+  /* score bands — ONE system for the ring, bars, best-fit and table scores */
+  --band-high: #10b981; --band-high-rgb: 16, 185, 129;  /* >= 70 */
+  --band-mid:  #f59e0b; --band-mid-rgb: 245, 158, 11;   /* 50-69 */
+  --band-low:  #ef4444; --band-low-rgb: 239, 68, 68;    /* < 50 */
+
+  /* radii */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 9999px;
+
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 18px 42px rgba(0, 0, 0, 0.10);
+  --shadow-accent: 0 14px 36px -10px rgba(var(--accent-rgb), 0.45);
+
+  /* spacing rhythm */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 72px;
+}
+
+/* per-page accent presets (preserve the DNA colours) */
+.accent-home     { --accent: #16181D; --accent-rgb: 22, 24, 29; }
+.accent-jobs     { --accent: #2563EB; --accent-rgb: 37, 99, 235; }
+.accent-match    { --accent: #0E9F6E; --accent-rgb: 14, 159, 110; }
+.accent-insights { --accent: #D97706; --accent-rgb: 217, 119, 6; }
+.accent-bestfit  { --accent: #7C3AED; --accent-rgb: 124, 58, 237; }
+.accent-history  { --accent: #E11D48; --accent-rgb: 225, 29, 72; }
+
+/* ── signature supporting motifs ── */
+/* blurred accent aura (one quiet drift per page) */
+.aura {
+  position: absolute; border-radius: 50%; pointer-events: none; z-index: 0;
+  background: var(--accent); filter: blur(80px); opacity: 0.16;
+  animation: auraDrift 18s ease-in-out infinite;
+}
+@keyframes auraDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(28px, -22px) scale(1.12); }
+}
+/* faint dotted grid echoing the monospace voice */
+.dotted-grid {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.055) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ── shared result/score blocks (used by /match AND the landing Match panel) ── */
+.band-tag { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 14px; border-radius: var(--r-pill); }
+.skill-card { flex: 1; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-lg); padding: 18px 20px; box-shadow: var(--shadow-sm); }
+.card-label { font-family: var(--font-mono), monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; }
+.srow { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 7px 8px; margin: 2px -8px; border-radius: var(--r-sm); transition: background 0.15s; }
+.srow.have:hover { background: rgba(var(--band-high-rgb), 0.09); }
+.srow.miss:hover { background: rgba(var(--band-low-rgb), 0.09); }
+.badge { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: #fff; flex: 0 0 auto; }
+.badge.ok { background: var(--band-high); }
+.badge.no { background: var(--band-low); }
+.verdict-card { position: relative; z-index: 1; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-xl); padding: 24px; box-shadow: var(--shadow-md); }
+.verdict-text { font-size: 17px; line-height: 1.55; margin: 4px 0 14px; color: var(--ink); }
+.verdict-take { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+.verdict-actions { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+.verdict-actions .btn { width: 100%; }
+.verdict-stats { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 13px; color: var(--muted); }
+.verdict-stats b { color: var(--ink); font-weight: 700; }
+.dot-sep { color: rgba(0, 0, 0, 0.25); }
+
 /* ── reset ── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 
 body {
-  background: #FAFAFB;
-  color: #16181D;
+  background: var(--bg);
+  color: var(--ink);
   font-family: var(--font-sans), -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -24,8 +105,8 @@ button { font-family: inherit; cursor: pointer; }
 .h-display {
   font-family: var(--font-grotesk), sans-serif;
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  letter-spacing: -0.01em; /* Clash Display sets tight spaces; -0.03 merged words */
+  line-height: 1.08;
 }
 .mono { font-family: var(--font-mono), monospace; }
 .muted { color: #6B7280; }
@@ -40,6 +121,12 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ── shared buttons ── */
 .btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-size: 15px;
   font-weight: 600;
   padding: 12px 22px;
@@ -47,10 +134,26 @@ button { font-family: inherit; cursor: pointer; }
   border: 1px solid transparent;
   transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
 }
-.btn-primary { background: #16181D; color: #fff; }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2); }
+
+/* click ripple (spec §4.4) */
+.ripple { position: absolute; border-radius: 50%; transform: scale(0); animation: ripple 0.6s ease-out; pointer-events: none; }
+@keyframes ripple { to { transform: scale(2.6); opacity: 0; } }
+
+/* spinner shown inside loading buttons / progress states */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-primary { background: #16181D; color: #fff; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.btn-primary:hover { transform: translateY(-1px) scale(1.04); box-shadow: 0 12px 26px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
 .btn-ghost { background: transparent; color: #16181D; border-color: rgba(0, 0, 0, 0.15); }
-.btn-ghost:hover { background: rgba(0, 0, 0, 0.04); }
+.btn-ghost:hover { background: rgba(0, 0, 0, 0.04); transform: translateY(-1px) scale(1.03); }
+.btn:active { transform: scale(0.97); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); transition: transform 0.05s ease-in; }
 
 /* ── shared cards ── */
 .card {
@@ -101,63 +204,6 @@ select:focus-visible {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
-
-/* ── ant: the brand mascot ── */
-.ant { display: block; }
-
-/* logo "scout": a little 3D character — pivots in perspective, bobs as it walks,
-   pauses to look up, with a soft ground shadow for depth. Pure CSS, no WebGL. */
-.ant-walk {
-  animation: antScout3D 2.8s ease-in-out infinite;
-  transform-origin: 50% 90%;
-  filter: drop-shadow(0 3px 2.5px rgba(0, 0, 0, 0.16));
-}
-@keyframes antScout3D {
-  0%   { transform: perspective(70px) rotateY(0deg) translateY(0); }
-  22%  { transform: perspective(70px) rotateY(-14deg) translateY(-1.5px); }
-  44%  { transform: perspective(70px) rotateY(0deg) translateY(0); }
-  54%  { transform: perspective(70px) rotateY(0deg) translateY(0) rotate(-6deg); }  /* look up */
-  64%  { transform: perspective(70px) rotateY(0deg) translateY(0) rotate(-6deg); }
-  78%  { transform: perspective(70px) rotateY(14deg) translateY(-1.5px); }          /* turn, walk on */
-  100% { transform: perspective(70px) rotateY(0deg) translateY(0); }
-}
-
-/* match loading: ant searches back and forth (flips direction at each end) */
-.ant-search { animation: antSearch 1.7s ease-in-out infinite; }
-@keyframes antSearch {
-  0%   { transform: translateX(-30px) scaleX(1); }
-  46%  { transform: translateX(30px) scaleX(1); }
-  50%  { transform: translateX(30px) scaleX(-1); }
-  96%  { transform: translateX(-30px) scaleX(-1); }
-  100% { transform: translateX(-30px) scaleX(1); }
-}
-
-/* ant perched on the match score ring; springs in with a double-bounce */
-.ring-ant {
-  position: absolute; top: -15px; left: 50%;
-  transform: translateX(-50%);
-  animation: antPlant 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  filter: drop-shadow(0 2px 1.5px rgba(0, 0, 0, 0.28)); /* casts onto the ring (depth) */
-}
-@keyframes antPlant {
-  0%   { opacity: 0; transform: translateX(-50%) translateY(-16px) scale(0.5); }
-  45%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.12); }
-  62%  { transform: translateX(-50%) translateY(-6px) scale(1); }
-  78%  { transform: translateX(-50%) translateY(0) scale(1.06); }
-  90%  { transform: translateX(-50%) translateY(-2px) scale(1); }
-  100% { transform: translateX(-50%) translateY(0) scale(1); }
-}
-
-/* confetti burst around the planted ant */
-.confetti { position: absolute; top: -8px; left: 50%; width: 0; height: 0; }
-.confetti span {
-  position: absolute; width: 6px; height: 6px; border-radius: 1px;
-  opacity: 0; animation: confettiBurst 0.85s ease-out forwards;
-}
-@keyframes confettiBurst {
-  0%   { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
-  100% { opacity: 0; transform: translate(var(--cx), var(--cy)) scale(0.4) rotate(200deg); }
-}
 
 /* ── respect reduced motion globally ── */
 @media (prefers-reduced-motion: reduce) {

@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { useToast } from "../_components/ToastProvider";
 import { AuthShell, Field } from "../login/page";
+
+const shake = { initial: { x: 0 }, animate: { x: [0, -6, 6, -5, 5, 0] }, transition: { duration: 0.4 } };
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -61,9 +64,9 @@ export default function RegisterPage() {
       <Field label="Name" type="text" value={name} placeholder="Linh Bui" onChange={setName} />
       <Field label="Email" type="email" value={email} placeholder="you@email.com" onChange={setEmail} />
       <Field label="Password" type="password" value={password} placeholder="At least 6 characters" onChange={setPassword} />
-      {error && <p className="form-error">{error}</p>}
+      {error && <motion.p className="form-error" key={error} {...shake}>{error}</motion.p>}
       <button className="btn btn-primary form-btn" onClick={handleRegister} disabled={loading}>
-        {loading ? "Creating account…" : "Create account"}
+        {loading ? <><span className="spinner" /> Creating account…</> : "Create account"}
       </button>
     </AuthShell>
   );

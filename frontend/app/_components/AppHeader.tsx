@@ -9,7 +9,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Ant from "./Ant";
 
 const LINKS = [
   { href: "/jobs",    label: "Jobs",    accent: "#2563EB" },
@@ -27,9 +26,13 @@ export default function AppHeader({ active }: { active?: string }) {
 
   return (
     <header className="app-header">
-      <Link href="/" className="brand" aria-label="Job Matcher home">
-        <Ant size={28} walk />
-        <span className="brand-name">Job Matcher</span>
+      <Link href="/" className="brand" aria-label="Job Fit home">
+        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="#16181D" />
+          <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="19.6" cy="9" r="1.9" fill="#FFFFFF" />
+        </svg>
+        <span className="brand-name">Job Fit</span>
       </Link>
 
       <nav className="app-links">

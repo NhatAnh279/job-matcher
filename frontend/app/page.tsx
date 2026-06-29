@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "@phosphor-icons/react";
-import Ant from "./_components/Ant";
+import ScoreArc from "./_components/ScoreArc";
+import { scoreBand } from "./_components/scoreBand";
 
 /* ════════════════════════════════════════════════════════════════
    1. CONFIG — each section owns its accent color (left → right)
@@ -30,29 +31,6 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-// Animate a number 0 → target whenever a panel becomes active
-function useCountUp(target: number, active: boolean, reduced: boolean, duration = 1100): number {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    if (!active) { setValue(0); return; }           // reset when leaving
-    if (reduced) { setValue(target); return; }      // no animation if user prefers
-
-    let raf = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);          // easeOutCubic
-      setValue(Math.round(target * eased));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [active, target, reduced, duration]);
-
-  return value;
 }
 
 type PanelProps = { active: boolean; accent: string; reduced: boolean };
@@ -99,24 +77,6 @@ function Bar({
   );
 }
 
-// Circular score ring; the number counts up and the ring fills together
-function ScoreRing({ target, accent, active, reduced }: { target: number } & PanelProps) {
-  const score = useCountUp(target, active, reduced);
-  return (
-    <div
-      className="ring"
-      style={{ background: `conic-gradient(${accent} ${score * 3.6}deg, rgba(0,0,0,.06) 0deg)` }}
-      role="img"
-      aria-label={`Match score ${target} out of 100`}
-    >
-      <div className="ring-inner">
-        <span className="ring-num">{score}</span>
-        <span className="ring-cap mono">/ 100</span>
-      </div>
-    </div>
-  );
-}
-
 /* ════════════════════════════════════════════════════════════════
    4. THE SIX PANELS
    ════════════════════════════════════════════════════════════════ */
@@ -132,7 +92,7 @@ function HeroPanel({ active, accent, goTo }: PanelProps & { goTo: (i: number) =>
       </Reveal>
       <Reveal show={active} delay={160}>
         <p className="lead" style={{ marginTop: 18, fontSize: 18, maxWidth: 540 }}>
-          Upload your resume and get a match score for any live role — with the exact
+          Upload your resume and get a match score for any live role, with the exact
           skills you already have and the ones you&apos;re missing.
         </p>
       </Reveal>
@@ -183,30 +143,61 @@ function JobsPanel({ active, accent }: PanelProps) {
   );
 }
 
-function MatchPanel({ active, accent, reduced }: PanelProps) {
-  const have = ["Python", "SQL"];
+function MatchPanel({ active }: PanelProps) {
+  const have = ["Python", "SQL", "Pandas"];
   const missing = ["Docker", "Power BI"];
+  const score = 78;
+  const band = scoreBand(score);
   return (
-    <div className="panel-inner">
+    <div className="panel-inner match-panel dotted-grid accent-match">
       <Reveal show={active}>
-        <h2 className="h-display h-sec" style={{ marginBottom: 32 }}>Strong backend match.</h2>
+        <p className="eyebrow">Resume → job, scored</p>
       </Reveal>
-      <div className="split">
-        <Reveal show={active} delay={120}>
-          <ScoreRing target={78} accent={accent} active={active} reduced={reduced} />
+      <div className="match-hero">
+        {/* Left: score ring */}
+        <Reveal show={active} delay={120} className="mh-ring">
+          <ScoreArc
+            value={active ? score : 0}
+            size={188}
+            thickness={14}
+            accentColor={band.color}
+            ticks
+            ariaLabel={`Match score ${score} out of 100`}
+          />
+          <span className="band-tag mono" style={{ color: band.color, background: `rgba(${band.rgb}, 0.12)` }}>
+            Strong match
+          </span>
         </Reveal>
-        <Reveal show={active} delay={220} className="skill-cols">
-          <div>
-            <p className="skill-label">You have</p>
+
+        {/* Middle: skill cards */}
+        <Reveal show={active} delay={200} className="mh-skills">
+          <div className="skill-card">
+            <p className="card-label">You have · {have.length}</p>
             {have.map((s) => (
-              <p key={s} className="skill-item"><span className="mark ok"><Check size={12} weight="bold" /></span> {s}</p>
+              <div key={s} className="srow have"><span className="badge ok"><Check size={12} weight="bold" /></span> {s}</div>
             ))}
           </div>
-          <div>
-            <p className="skill-label">You&apos;re missing</p>
+          <div className="skill-card">
+            <p className="card-label">Missing · {missing.length}</p>
             {missing.map((s) => (
-              <p key={s} className="skill-item"><span className="mark no"><X size={12} weight="bold" /></span> {s}</p>
+              <div key={s} className="srow miss"><span className="badge no"><X size={12} weight="bold" /></span> {s}</div>
             ))}
+          </div>
+        </Reveal>
+
+        {/* Right: verdict */}
+        <Reveal show={active} delay={280} className="verdict-card">
+          <p className="card-label">Verdict</p>
+          <p className="verdict-text">Strong backend match. Missing DevOps and BI tools.</p>
+          <p className="verdict-take">You&apos;re a strong fit. Worth applying.</p>
+          <div className="verdict-actions">
+            <Link href="/match" className="btn btn-primary">See what moved the score →</Link>
+            <Link href="/jobs" className="btn btn-ghost">Back to jobs</Link>
+          </div>
+          <div className="verdict-stats mono">
+            <span><b>{have.length}</b> matched</span>
+            <span className="dot-sep">·</span>
+            <span><b>{missing.length}</b> missing</span>
           </div>
         </Reveal>
       </div>
@@ -394,9 +385,13 @@ export default function LandingPage() {
         {/* Behavior 4: logo resets to the first panel */}
         <button className="brand" onClick={() => goTo(0)} aria-label="Back to start">
           <span className="brand-mark" aria-hidden>
-            <Ant size={32} walk />
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect width="28" height="28" rx="8" fill="#16181D" />
+              <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="19.6" cy="9" r="1.9" fill="#FFFFFF" />
+            </svg>
           </span>
-          <span className="brand-name">Job Matcher</span>
+          <span className="brand-name">Job Fit</span>
         </button>
 
         {/* Behavior 3+5: nav links (Jobs…History), active one pops in its accent */}
@@ -532,19 +527,12 @@ export default function LandingPage() {
         .fit-card { border: 1px solid rgba(0,0,0,.08); }
         .fit-score { font-size: 40px; font-weight: 700; margin-top: 14px; }
 
-        /* ── match panel ── */
-        .split { display: flex; align-items: center; gap: 56px; }
-        .split-top { align-items: flex-start; }
-        .ring { width: 200px; height: 200px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; }
-        .ring-inner { width: calc(100% - 26px); height: calc(100% - 26px); background: #fff; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
-        .ring-num { font-family: var(--font-mono), monospace; font-weight: 700; font-size: 46px; }
-        .ring-cap { font-size: 12px; color: #9CA3AF; margin-top: -4px; }
-        .skill-cols { display: flex; gap: 56px; }
+        /* ── match panel (3 columns: ring · skills · verdict; card/verdict styles in globals) ── */
+        .match-panel { width: 100%; }
+        .match-hero { display: grid; grid-template-columns: auto 1fr 1fr; gap: 18px; align-items: stretch; margin-top: 22px; }
+        .mh-ring { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-xl); box-shadow: var(--shadow-md); }
+        .mh-skills { display: flex; flex-direction: column; gap: 14px; }
         .skill-label { font-family: var(--font-mono), monospace; font-size: 13px; color: #6B7280; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .06em; }
-        .skill-item { font-size: 17px; margin: 8px 0; display: flex; align-items: center; gap: 10px; }
-        .mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: #fff; }
-        .mark.ok { background: #0E9F6E; }
-        .mark.no { background: #E11D48; }
 
         /* ── bars ── */
         .bar-group { flex: 1; }
@@ -569,9 +557,7 @@ export default function LandingPage() {
           .nav-center { display: none; }
           .panel-inner { padding: 0 24px; }
           .grid-3 { grid-template-columns: 1fr; }
-          .split, .skill-cols { flex-direction: column; align-items: flex-start; gap: 28px; }
-          .ring { width: 150px; height: 150px; }
-          .ring-num { font-size: 34px; }
+          .match-hero { grid-template-columns: 1fr; }
         }
 
         /* ── reduced motion ── */

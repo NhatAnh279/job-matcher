@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MagnifyingGlass, MapPin, CaretDown, Star, X, Check, Funnel, Stack, Brain, ChartBar, ChartPieSlice, Code } from "@phosphor-icons/react";
+import { MagnifyingGlass, MapPin, CaretDown, Star, X, Check, Funnel, Stack, Brain, ChartBar, ChartPieSlice, Code, Cloud, PenNib, Megaphone, Wallet } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import AppHeader from "../_components/AppHeader";
+import TiltCard from "../_components/TiltCard";
 import { useToast } from "../_components/ToastProvider";
 import { useRequireAuth } from "../_components/useRequireAuth";
 
@@ -100,6 +101,48 @@ const MOCK_JOBS: Job[] = [
     highlights: ["Build exec dashboards", "Cross-team projects", "Hybrid 3 days office"],
     skills: ["Power BI", "SQL", "DAX"],
   },
+  {
+    id: "5", role: "DevOps Engineer", company: "Canva", location: "Sydney NSW", type: "Hybrid",
+    employmentType: "Full-time", classification: "Engineering", source: "Seek",
+    salary: "$130k - $160k", salaryMin: 130, postedDays: 1, posted: "1d ago",
+    highlights: ["Own the CI/CD pipeline", "Kubernetes at scale", "On-call rotation"],
+    skills: ["AWS", "Kubernetes", "Terraform"],
+  },
+  {
+    id: "6", role: "Cloud Engineer", company: "REA Group", location: "Brisbane QLD", type: "Remote",
+    employmentType: "Full-time", classification: "Engineering", source: "Seek",
+    salary: "$135k - $165k", salaryMin: 135, postedDays: 3, posted: "3d ago",
+    highlights: ["Multi-cloud platform", "Infrastructure as code", "Strong eng culture"],
+    skills: ["GCP", "Terraform", "Go"],
+  },
+  {
+    id: "7", role: "Software Engineer", company: "Atlassian", location: "Remote", type: "Remote",
+    employmentType: "Full-time", classification: "Engineering", source: "Jora",
+    salary: "$125k - $150k", salaryMin: 125, postedDays: 1, posted: "1d ago",
+    highlights: ["Full-stack product work", "TypeScript + React", "Ship weekly"],
+    skills: ["TypeScript", "React", "Node"],
+  },
+  {
+    id: "8", role: "Product Designer", company: "Airwallex", location: "Melbourne VIC", type: "Hybrid",
+    employmentType: "Full-time", classification: "Design", source: "Seek",
+    salary: "$110k - $135k", salaryMin: 110, postedDays: 4, posted: "4d ago",
+    highlights: ["End-to-end product design", "Own the design system", "Tight eng partnership"],
+    skills: ["Figma", "Prototyping", "UX"],
+  },
+  {
+    id: "9", role: "Growth Marketer", company: "Linktree", location: "Melbourne VIC", type: "Hybrid",
+    employmentType: "Full-time", classification: "Marketing", source: "Jora",
+    salary: "$95k - $120k", salaryMin: 95, postedDays: 2, posted: "2d ago",
+    highlights: ["Own paid acquisition", "Experiment-driven", "B2C consumer app"],
+    skills: ["SEO", "Analytics", "Paid Ads"],
+  },
+  {
+    id: "10", role: "Financial Analyst", company: "Telstra", location: "Sydney NSW", type: "On-site",
+    employmentType: "Full-time", classification: "Finance", source: "Jora",
+    salary: "$100k - $125k", salaryMin: 100, postedDays: 6, posted: "6d ago",
+    highlights: ["FP&A for a large org", "Model the roadmap", "Exec reporting"],
+    skills: ["Excel", "SQL", "Modelling"],
+  },
 ];
 
 /* ── Occupation fields: the category cards (top row) + occupation checkboxes
@@ -109,14 +152,22 @@ const FIELDS = [
   { key: "Data & Analytics",      icon: ChartBar },
   { key: "Business Intelligence", icon: ChartPieSlice },
   { key: "Engineering",           icon: Code },
+  { key: "Cloud & DevOps",        icon: Cloud },
+  { key: "Product & Design",      icon: PenNib },
+  { key: "Marketing & Growth",    icon: Megaphone },
+  { key: "Finance & Operations",  icon: Wallet },
 ] as const;
 
 function fieldOf(job: Job): string {
   const r = job.role.toLowerCase();
-  if (r.includes("scientist") || r.includes("machine") || r.includes("ml ") || r.startsWith("ml")) return "Data Science & ML";
+  if (r.includes("scientist") || r.includes("machine learning") || r.includes("ml ") || r.startsWith("ml") || r.includes("ai ")) return "Data Science & ML";
+  if (r.includes("devops") || r.includes("sre") || r.includes("platform") || r.includes("cloud") || r.includes("infrastructure")) return "Cloud & DevOps";
   if (r.includes("bi ") || r.includes("business intelligence") || r.includes("power bi")) return "Business Intelligence";
+  if (r.includes("design") || r.includes("ux") || r.includes("ui ") || r.includes("product manager") || r.includes("product owner")) return "Product & Design";
+  if (r.includes("market") || r.includes("growth") || r.includes("seo") || r.includes("content")) return "Marketing & Growth";
+  if (r.includes("finance") || r.includes("account") || r.includes("operations")) return "Finance & Operations";
   if (r.includes("analyst")) return "Data & Analytics";
-  if (r.includes("engineer") || r.includes("developer")) return "Engineering";
+  if (r.includes("engineer") || r.includes("developer") || r.includes("programmer")) return "Engineering";
   return "Data & Analytics";
 }
 
@@ -466,11 +517,7 @@ export default function JobsPage() {
               {filtered.map((job, i) => {
                 const isSaved = saved.has(job.id);
                 return (
-                  <article
-                    key={job.id}
-                    className="card job-card"
-                    style={{ animationDelay: reduced ? "0ms" : `${i * 70}ms` }}
-                  >
+                  <TiltCard key={job.id} className="card job-card" index={i}>
                     <div className="job-head">
                       <div>
                         <h3 className="job-role">{job.role}</h3>
@@ -527,7 +574,7 @@ export default function JobsPage() {
                         </Link>
                       </div>
                     </div>
-                  </article>
+                  </TiltCard>
                 );
               })}
             </div>
@@ -629,9 +676,8 @@ export default function JobsPage() {
 
         /* ── job card + entrance animation ── */
         .results { display: flex; flex-direction: column; gap: 16px; }
-        .job-card { animation: cardIn .5s cubic-bezier(.22,1,.36,1) both; transition: transform .18s, box-shadow .2s, border-color .2s; }
-        .job-card:hover { transform: translateY(-3px) scale(1.005); box-shadow: 0 10px 28px rgba(0,0,0,.07); border-color: rgba(0,0,0,.2); }
-        @keyframes cardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        .job-card { transition: box-shadow .25s, border-color .25s; }
+        .job-card:hover { box-shadow: 0 18px 40px rgba(0,0,0,.10); border-color: rgba(37,99,235,.4); }
         .job-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
         .job-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 20px; letter-spacing: -.01em; }
         .job-company { color: #6B7280; font-size: 15px; margin-top: 2px; }

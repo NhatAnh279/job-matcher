@@ -1,4 +1,4 @@
-# Job Matcher — app folder
+# Job Fit — app folder
 
 This is the complete `app/` folder for the frontend. It contains every page:
 

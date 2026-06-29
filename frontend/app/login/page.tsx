@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import api from "@/lib/api";
-import Ant from "../_components/Ant";
 import { useToast } from "../_components/ToastProvider";
+
+// Error message that shakes when it appears (spec §2.4).
+const shake = { initial: { x: 0 }, animate: { x: [0, -6, 6, -5, 5, 0] }, transition: { duration: 0.4 } };
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -54,14 +57,14 @@ export default function LoginPage() {
   return (
     <AuthShell
       eyebrow="Welcome back"
-      title="Log in to Job Matcher"
+      title="Log in to Job Fit"
       footer={<>New here? <Link href="/register" className="link">Create an account</Link></>}
     >
       <Field label="Email" type="email" value={email} placeholder="you@email.com" onChange={setEmail} />
       <Field label="Password" type="password" value={password} placeholder="••••••••" onChange={setPassword} />
-      {error && <p className="form-error">{error}</p>}
+      {error && <motion.p className="form-error" key={error} {...shake}>{error}</motion.p>}
       <button className="btn btn-primary form-btn" onClick={handleLogin} disabled={loading}>
-        {loading ? "Logging in…" : "Log in"}
+        {loading ? <><span className="spinner" /> Logging in…</> : "Log in"}
       </button>
     </AuthShell>
   );
@@ -73,9 +76,13 @@ export function AuthShell({
 }: { eyebrow: string; title: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
     <div className="auth-stage">
-      <Link href="/" className="auth-brand" aria-label="Job Matcher home">
-        <Ant size={32} walk />
-        <span className="auth-brand-name">Job Matcher</span>
+      <Link href="/" className="auth-brand" aria-label="Job Fit home">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="#16181D" />
+          <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="19.6" cy="9" r="1.9" fill="#fff" />
+        </svg>
+        <span className="auth-brand-name">Job Fit</span>
       </Link>
 
       <div className="auth-card">
@@ -93,7 +100,10 @@ export function AuthShell({
         .auth-title { font-size: 24px; margin: 6px 0 22px; }
         .auth-fields { display: flex; flex-direction: column; gap: 16px; }
         .auth-footer { font-size: 14px; text-align: center; margin-top: 22px; }
-        .link { color: #2563EB; font-weight: 500; }
+        .link { position: relative; color: #2563EB; font-weight: 500; transition: color .15s ease-out; }
+        .link::after { content: ""; position: absolute; left: 0; bottom: -2px; width: 0; height: 2px; background: #2563EB; transition: width .2s ease-out; }
+        .link:hover { color: #1d4ed8; }
+        .link:hover::after { width: 100%; }
         .form-error { font-size: 14px; color: #E11D48; }
         .form-btn { width: 100%; margin-top: 4px; }
       `}</style>

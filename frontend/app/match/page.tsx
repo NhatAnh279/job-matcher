@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import { UploadSimple, Check, X } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import AppHeader from "../_components/AppHeader";
-import Ant from "../_components/Ant";
+import ConfettiBurst from "../_components/ConfettiBurst";
+import ScoreArc from "../_components/ScoreArc";
+import AccentMeter from "../_components/AccentMeter";
+import { scoreBand } from "../_components/scoreBand";
 import { useToast } from "../_components/ToastProvider";
 import { useRequireAuth } from "../_components/useRequireAuth";
 
+const shake = { initial: { x: 0 }, animate: { x: [0, -6, 6, -5, 5, 0] }, transition: { duration: 0.4 } };
+
 const ACCENT = "#0E9F6E";
-const ROSE = "#E11D48";
 
 /* ════════════════════════════════════════════════════════════════
    CONTRACT SHAPES — exactly what the API returns (see API Contract v3)
@@ -178,13 +184,22 @@ export default function MatchPage() {
   // shap_scores (object) -> sorted bars; scaled against the largest magnitude.
   const impact = result ? Object.entries(result.shap_scores).map(([label, v]) => ({ label, v })) : [];
   const maxImpact = Math.max(...impact.map((d) => Math.abs(d.v)), 0.0001);
+  const band = result ? scoreBand(result.score) : null;
+  const bandLabel = result ? (result.score >= 70 ? "Strong match" : result.score >= 50 ? "Partial match" : "Weak match") : "";
+  const takeaway = result
+    ? result.score >= 70
+      ? "You're a strong fit. Worth applying."
+      : result.score >= 50
+        ? "A partial fit. Closing a couple of gaps would lift this."
+        : "A stretch for now. Focus on the missing skills first."
+    : "";
 
   if (!authed) return null; // redirecting to /login
 
   return (
     <>
       <AppHeader active="/match" />
-      <main className="wrap page-enter">
+      <main className="wrap page-enter accent-match">
         <p className="eyebrow">Resume → job, scored</p>
         <h1 className="h-display page-title">Match my resume</h1>
 
@@ -209,21 +224,23 @@ export default function MatchPage() {
             <span className="muted drop-hint">PDF · up to 5MB</span>
           </label>
           <button className="btn btn-primary" onClick={handleMatch} disabled={loading}>
-            {loading ? "Scoring…" : "Get my match score"}
+            {loading ? <><span className="spinner" /> Scoring…</> : "Get my match score"}
           </button>
         </div>
-        {error && <p className="note muted">{error}</p>}
+        {error && <motion.p className="note muted" key={error} {...shake}>{error}</motion.p>}
 
-        {/* Scoring skeleton — ant frantically searches while we score */}
+        {/* Processing: circular progress while we score */}
         {loading && (
           <div className="results">
             <section className="card block">
-              <div className="ant-work">
-                <span className="ant-work-track"><Ant size={30} color={ACCENT} className="ant-search" /></span>
-                <span className="muted ant-work-cap">Scouting your match…</span>
-              </div>
-              <div className="score-row" style={{ marginTop: 24 }}>
-                <span className="skeleton" style={{ width: 168, height: 168, borderRadius: "50%", flex: "0 0 auto" }} />
+              <div className="score-row">
+                <div className="progress-ring">
+                  <svg viewBox="0 0 100 100" className="progress-svg">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(0,0,0,.07)" strokeWidth="8" />
+                    <circle cx="50" cy="50" r="44" fill="none" stroke={ACCENT} strokeWidth="8" strokeLinecap="round" strokeDasharray="80 200" />
+                  </svg>
+                  <span className="progress-cap mono">Analyzing…</span>
+                </div>
                 <div className="sk-skills">
                   <span className="skeleton" style={{ width: 90, height: 13 }} />
                   <span className="skeleton" style={{ width: 130, height: 18 }} />
@@ -238,58 +255,81 @@ export default function MatchPage() {
         {/* Results */}
         {!loading && result && (
           <div className="results">
-            {/* Score + skills */}
-            <section className="card block">
-              <h2 className="h-display block-title">
-                {result.score >= 70 ? "Strong match." : result.score >= 50 ? "Partial match." : "Weak match."}
-              </h2>
-              {result.explanation && <p className="muted explain">{result.explanation}</p>}
-              <div className="score-row">
-                <div
-                  className="ring"
-                  style={{ background: `conic-gradient(${ACCENT} ${result.score * 3.6}deg, rgba(0,0,0,.06) 0deg)` }}
-                  role="img"
-                  aria-label={`Match score ${result.score} out of 100`}
+            {/* Match result — 3 columns: ring · skill cards · verdict */}
+            <section className="result-hero">
+              <span className="rh-aura aura" aria-hidden />
+
+              {/* Left: score ring (hero) */}
+              <motion.div
+                className="rh-ring"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="rh-ring-inner">
+                  <ConfettiBurst />
+                  <ScoreArc
+                    value={result.score}
+                    size={196}
+                    thickness={14}
+                    accentColor={band!.color}
+                    ticks
+                    ariaLabel={`Match score ${result.score} out of 100`}
+                  />
+                </div>
+                <span
+                  className="band-tag mono"
+                  style={{ color: band!.color, background: `rgba(${band!.rgb}, 0.12)` }}
                 >
-                  <span className="confetti" aria-hidden>
-                    {Array.from({ length: 10 }).map((_, i) => {
-                      const a = (i / 10) * Math.PI * 2;
-                      const dist = 24 + (i % 3) * 9;
-                      const palette = [ACCENT, "#2563EB", "#D97706", "#E11D48"];
-                      return (
-                        <span
-                          key={i}
-                          style={{
-                            "--cx": `${Math.cos(a) * dist}px`,
-                            "--cy": `${Math.sin(a) * dist}px`,
-                            background: palette[i % palette.length],
-                            animationDelay: `${i * 0.015}s`,
-                          } as CSSProperties}
-                        />
-                      );
-                    })}
-                  </span>
-                  <span className="ring-ant"><Ant size={26} color={ACCENT} flag /></span>
-                  <div className="ring-inner">
-                    <span className="ring-num">{result.score}</span>
-                    <span className="ring-cap mono">/ 100</span>
-                  </div>
+                  {bandLabel}
+                </span>
+              </motion.div>
+
+              {/* Middle: skill cards */}
+              <motion.div
+                className="rh-skills"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="skill-card">
+                  <p className="card-label">You have · {result.matched_skills.length}</p>
+                  {result.matched_skills.map((s) => (
+                    <div key={s} className="srow have">
+                      <span className="badge ok"><Check size={12} weight="bold" /></span> {s}
+                    </div>
+                  ))}
                 </div>
-                <div className="skill-cols">
-                  <div>
-                    <p className="skill-label">You have</p>
-                    {result.matched_skills.map((s) => (
-                      <p key={s} className="skill-item"><span className="mark ok"><Check size={12} weight="bold" /></span> {s}</p>
-                    ))}
-                  </div>
-                  <div>
-                    <p className="skill-label">You&apos;re missing</p>
-                    {result.missing_skills.map((s) => (
-                      <p key={s} className="skill-item"><span className="mark no"><X size={12} weight="bold" /></span> {s}</p>
-                    ))}
-                  </div>
+                <div className="skill-card">
+                  <p className="card-label">Missing · {result.missing_skills.length}</p>
+                  {result.missing_skills.map((s) => (
+                    <div key={s} className="srow miss">
+                      <span className="badge no"><X size={12} weight="bold" /></span> {s}
+                    </div>
+                  ))}
                 </div>
-              </div>
+              </motion.div>
+
+              {/* Right: verdict / explanation (fills the space) */}
+              <motion.div
+                className="verdict-card"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <p className="card-label">Verdict</p>
+                {result.explanation && <p className="verdict-text">{result.explanation}</p>}
+                <p className="verdict-take">{takeaway}</p>
+                <div className="verdict-actions">
+                  <a href="#insights" className="btn btn-primary">See what moved the score →</a>
+                  <Link href="/jobs" className="btn btn-ghost">Back to jobs</Link>
+                </div>
+                <div className="verdict-stats mono">
+                  <span><b>{result.matched_skills.length}</b> matched</span>
+                  <span className="dot-sep">·</span>
+                  <span><b>{result.missing_skills.length}</b> missing</span>
+                </div>
+              </motion.div>
             </section>
 
             {/* Job description, with your matched / missing skills highlighted in place */}
@@ -320,26 +360,28 @@ export default function MatchPage() {
             )}
 
             {/* Insights — skill impact (from this match) + market demand (separate endpoint) */}
-            <section className="card block">
+            <section className="card block" id="insights">
               <h2 className="h-display block-title">What moved the needle</h2>
               <div className="bars-2col">
                 <div>
                   <p className="skill-label">Skill impact</p>
-                  {impact.map((d) => (
-                    <BarRow
+                  {impact.map((d, i) => (
+                    <AccentMeter
                       key={d.label}
                       label={d.label}
                       valueText={`${d.v >= 0 ? "+" : "-"}${Math.abs(d.v).toFixed(2)}`}
                       pct={(Math.abs(d.v) / maxImpact) * 100}
-                      color={d.v < 0 ? ROSE : ACCENT}
+                      negative={d.v < 0}
+                      baseline
+                      delay={i * 0.08}
                     />
                   ))}
                 </div>
                 {demand.length > 0 && (
                   <div>
                     <p className="skill-label">Market demand</p>
-                    {demand.map((d) => (
-                      <BarRow key={d.name} label={d.name} valueText={`${d.demand}`} pct={d.demand} color={ACCENT} />
+                    {demand.map((d, i) => (
+                      <AccentMeter key={d.name} label={d.name} valueText={`${d.demand}`} pct={d.demand} delay={i * 0.08} />
                     ))}
                   </div>
                 )}
@@ -351,18 +393,27 @@ export default function MatchPage() {
               <section className="card block">
                 <h2 className="h-display block-title">Where your skills cluster</h2>
                 <div className="fit-grid">
-                  {bestFit.map((r, i) => (
-                    <div
-                      key={r.title}
-                      className="fit-card"
-                      style={i === 0 ? { background: `${ACCENT}1f`, borderColor: `${ACCENT}66` } : undefined}
-                    >
-                      <p className="card-meta mono">{i === 0 ? "Best fit" : `Rank ${i + 1}`}</p>
-                      <h3 className="fit-role">{r.title}</h3>
-                      <p className="fit-score mono" style={{ color: ACCENT }}>{r.fit}</p>
-                      {r.note && <p className="muted fit-note">{r.note}</p>}
-                    </div>
-                  ))}
+                  {bestFit.map((r, i) => {
+                    const fb = scoreBand(r.fit);
+                    return (
+                      <motion.div
+                        key={r.title}
+                        className={`fit-card ${i === 0 ? "featured" : ""}`}
+                        initial={{ opacity: 0, y: 16 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.4 }}
+                        transition={{ duration: 0.45, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                        whileHover={{ y: -4 }}
+                      >
+                        <p className="card-meta mono">{i === 0 ? "★ Best fit" : `Rank ${i + 1}`}</p>
+                        <h3 className="fit-role">{r.title}</h3>
+                        <p className="fit-score mono" style={{ color: fb.color }}>
+                          {r.fit}<span className="fit-pct">%</span>
+                        </p>
+                        {r.note && <p className="muted fit-note">{r.note}</p>}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </section>
             )}
@@ -371,16 +422,17 @@ export default function MatchPage() {
       </main>
 
       <style>{`
-        .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+        .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 80px; }
         .page-title { font-size: clamp(30px, 5vw, 44px); margin: 6px 0 28px; }
         .upload { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
         .drop { flex: 1; min-width: 240px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px; border: 2px dashed rgba(0,0,0,.15); border-radius: 14px; cursor: pointer; transition: border-color .2s, background .2s; }
         .drop:hover { border-color: #16181D; }
-        .drop.drag { border-color: #0E9F6E; background: rgba(14,159,110,.06); }
+        .drop.drag { border-color: #0E9F6E; background: rgba(14,159,110,.06); animation: dropPulse 1s ease-in-out infinite; }
+        @keyframes dropPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
         .sk-skills { display: flex; flex-direction: column; gap: 12px; }
-        .ant-work { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 2px 0 8px; }
-        .ant-work-track { display: block; height: 22px; }
-        .ant-work-cap { font-size: 13px; }
+        .progress-ring { position: relative; width: 168px; height: 168px; flex: 0 0 auto; display: grid; place-items: center; }
+        .progress-svg { width: 100%; height: 100%; animation: spin 1.1s linear infinite; }
+        .progress-cap { position: absolute; font-size: 13px; color: #6B7280; }
         .drop-icon { font-size: 24px; font-weight: 700; }
         .drop-text { font-weight: 600; font-size: 15px; }
         .drop-hint { font-size: 12px; }
@@ -388,25 +440,27 @@ export default function MatchPage() {
         .results { display: flex; flex-direction: column; gap: 20px; margin-top: 28px; }
         .block { padding: 28px; }
         .block-title { font-size: 22px; margin-bottom: 22px; }
-        .explain { font-size: 15px; line-height: 1.55; margin: -14px 0 22px; max-width: 60ch; }
-        .score-row { display: flex; align-items: center; gap: 44px; flex-wrap: wrap; }
-        .ring { position: relative; width: 168px; height: 168px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; box-shadow: 0 16px 32px -10px rgba(0,0,0,.22), 0 2px 0 rgba(0,0,0,.05); }
-        .ring-inner { width: calc(100% - 24px); height: calc(100% - 24px); background: #fff; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
-        .ring-num { font-family: var(--font-mono), monospace; font-weight: 700; font-size: 40px; }
-        .ring-cap { font-size: 12px; color: #9CA3AF; margin-top: -2px; }
-        .skill-cols { display: flex; gap: 48px; flex-wrap: wrap; }
-        .skill-label { font-family: var(--font-mono), monospace; font-size: 13px; color: #6B7280; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .06em; }
-        .skill-item { font-size: 16px; margin: 8px 0; display: flex; align-items: center; gap: 10px; }
-        .mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: #fff; }
-        .mark.ok { background: #0E9F6E; }
-        .mark.no { background: #E11D48; }
+        .skill-label { font-family: var(--font-mono), monospace; font-size: 12px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .08em; }
+
+        /* ── result hero: 3 columns (ring · skills · verdict); shared card/verdict styles live in globals.css ── */
+        .result-hero { position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1fr 1.05fr; gap: 18px; align-items: stretch; }
+        .rh-aura { width: 320px; height: 320px; top: -150px; right: -90px; }
+        .rh-ring { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 26px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-xl); box-shadow: var(--shadow-md); }
+        .rh-ring-inner { position: relative; display: grid; place-items: center; }
+        .rh-skills { display: flex; flex-direction: column; gap: 14px; }
+        @media (max-width: 860px) { .result-hero { grid-template-columns: 1fr; } }
         .bars-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
         .fit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .fit-card { border: 1px solid rgba(0,0,0,.08); border-radius: 14px; padding: 20px; }
-        .card-meta { font-size: 12px; color: #6B7280; }
-        .fit-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 18px; margin-top: 6px; }
-        .fit-score { font-size: 36px; font-weight: 700; margin-top: 10px; }
-        .fit-note { font-size: 13px; margin-top: 6px; line-height: 1.45; }
+        .fit-card { position: relative; border: 1px solid var(--hairline); border-radius: var(--r-lg); padding: 22px; background: var(--surface); box-shadow: var(--shadow-sm); transition: box-shadow .25s, border-color .25s; }
+        .fit-card:hover { box-shadow: var(--shadow-md); }
+        .fit-card.featured { background: var(--accent-soft); border-color: var(--accent-line); box-shadow: var(--shadow-accent); }
+        .card-meta { font-family: var(--font-mono), monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+        .fit-card.featured .card-meta { color: var(--accent); }
+        .fit-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 18px; margin-top: 8px; }
+        .fit-score { font-family: var(--font-mono), monospace; font-weight: 700; font-size: 38px; margin-top: 10px; line-height: 1; font-variant-numeric: tabular-nums; }
+        .fit-card.featured .fit-score { font-size: 48px; }
+        .fit-pct { font-size: 0.5em; color: var(--muted); margin-left: 2px; }
+        .fit-note { font-size: 13px; margin-top: 8px; line-height: 1.45; }
         /* ── JD highlight ── */
         .jd-arrangement { font-size: 12px; color: #9CA3AF; text-transform: capitalize; margin: -14px 0 18px; }
         .jd-text { font-size: 17px; line-height: 1.95; color: #16181D; }
@@ -428,24 +482,5 @@ export default function MatchPage() {
         }
       `}</style>
     </>
-  );
-}
-
-// One static bar (this page shows results on demand, so no entry animation needed)
-function BarRow({ label, valueText, pct, color }: { label: string; valueText: string; pct: number; color: string }) {
-  return (
-    <div className="bar-row">
-      <div className="bar-head">
-        <span>{label}</span>
-        <span style={{ color }}>{valueText}</span>
-      </div>
-      <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
-      <style>{`
-        .bar-row { margin-bottom: 16px; }
-        .bar-head { display: flex; justify-content: space-between; font-family: var(--font-mono), monospace; font-size: 13px; margin-bottom: 6px; }
-        .bar-track { height: 10px; border-radius: 9999px; background: rgba(0,0,0,.06); overflow: hidden; }
-        .bar-fill { height: 100%; border-radius: 9999px; transition: width .8s cubic-bezier(.22,1,.36,1); }
-      `}</style>
-    </div>
   );
 }
