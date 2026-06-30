@@ -1,3 +1,6 @@
+import re
+import json
+
 SKILLS = {
 
     "IT": [
@@ -1173,3 +1176,19 @@ SKILLS = {
         "Project Management"
     ]    
 }
+
+def extract_skills(text):
+    extracted_skills = []
+    text_lower = text.lower()
+    for skills in SKILLS.values():
+        for skill in skills:
+            pattern = r'\b' + re.escape(skill.lower()) + r'\b'
+            if re.search(pattern, text_lower):
+                extracted_skills.append(skill)
+    return list(set(extracted_skills))
+
+
+with open("backend/app/data/jobs.json", "r") as f:
+    jobs = json.load(f)
+
+print (extract_skills(jobs[0]["description"]))
