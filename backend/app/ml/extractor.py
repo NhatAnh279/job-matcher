@@ -1197,7 +1197,8 @@ def extract_skills(text):
                 pattern = r'\b' + re.escape(skill.lower()) + r'\b'
                 if re.search(pattern, text_lower):
                     extracted_skills.append(skill)
-                
+    
+    # Solving edge cases            
     if ("C++" in extracted_skills or "C#" in extracted_skills) and "C" in extracted_skills:
         extracted_skills.remove("C")
     if "ASP.NET" in extracted_skills and ".NET" in extracted_skills:
@@ -1242,6 +1243,4 @@ def calculate_match(resume_text, jd_text):
         "missing_skills": missing_skills
     }
             
-result = calculate_match("I have experience in Python, Java, SQL", "We are looking for a software engineer strong in Python, Java, SQL, and C++")
-print(result)
-    
+ 
