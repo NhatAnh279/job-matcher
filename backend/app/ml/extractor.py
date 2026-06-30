@@ -1,5 +1,10 @@
 import re
 import json
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Load the pre-trained SBERT model
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
 SKILLS = {
 
@@ -1177,6 +1182,7 @@ SKILLS = {
     ]    
 }
 
+# Common Skills Extraction Function
 def extract_skills(text):
     extracted_skills = []
     text_lower = text.lower()
@@ -1188,7 +1194,12 @@ def extract_skills(text):
     return list(set(extracted_skills))
 
 
-with open("backend/app/data/jobs.json", "r") as f:
-    jobs = json.load(f)
+# SBERT Model for less common skills
+def match_resume(resume_text, jd_text):
+    embeddings = model.encode([jd_text, resume_text])
+    similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+    return round(similarity * 100, 2)
 
-print (extract_skills(jobs[0]["description"]))
+score = match_resume("I have experience in Python, Java, and SQL and C++.", "Looking for a solid software engineer who knows Python, Java, SQL, C++.")
+print(f"Resume Match Score: {score}%")
+    
