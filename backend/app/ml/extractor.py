@@ -1187,10 +1187,22 @@ def extract_skills(text):
     extracted_skills = []
     text_lower = text.lower()
     for skills in SKILLS.values():
-        for skill in skills:
-            pattern = r'\b' + re.escape(skill.lower()) + r'\b'
-            if re.search(pattern, text_lower):
-                extracted_skills.append(skill)
+        sorted_skills = sorted(skills, key=len, reverse=True)
+        for skill in sorted_skills:
+            # Special Character Handling
+            if '+' in skill or '#' in skill or '.' in skill:
+                if skill.lower() in text_lower:
+                    extracted_skills.append(skill)
+            else:
+                pattern = r'\b' + re.escape(skill.lower()) + r'\b'
+                if re.search(pattern, text_lower):
+                    extracted_skills.append(skill)
+                
+    if ("C++" in extracted_skills or "C#" in extracted_skills) and "C" in extracted_skills:
+        extracted_skills.remove("C")
+    if "ASP.NET" in extracted_skills and ".NET" in extracted_skills:
+        extracted_skills.remove(".NET")
+    
     return list(set(extracted_skills))
 
 
@@ -1200,6 +1212,36 @@ def match_resume(resume_text, jd_text):
     similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
     return round(similarity * 100, 2)
 
-score = match_resume("I have experience in Python, Java, and SQL and C++.", "Looking for a solid software engineer who knows Python, Java, SQL, C++.")
-print(f"Resume Match Score: {score}%")
+def calculate_match(resume_text, jd_text):
+    # Extract skills from both resume and JD
+    resume_skills = extract_skills(resume_text)
+    jd_skills = extract_skills(jd_text)
+    
+    # Calculate match percentage
+    matched = []
+    for skill in jd_skills:
+        if skill in resume_skills:
+            matched.append(skill)
+    keyword_match_score = (len(matched) / len(jd_skills) if jd_skills else 0)
+    
+    # Calculate similarity score using SBERT
+    similarity_score = match_resume(resume_text, jd_text) / 100
+    
+    # Combine both scores
+    final_score = keyword_match_score * 0.4 + similarity_score * 0.6
+    
+    # Missing Skills
+    missing_skills = []
+    for skill in jd_skills:
+        if skill not in resume_skills:
+            missing_skills.append(skill)
+    
+    return {
+        "score": round(float(final_score) * 100, 2),
+        "matched_skills": matched,
+        "missing_skills": missing_skills
+    }
+            
+result = calculate_match("I have experience in Python, Java, SQL", "We are looking for a software engineer strong in Python, Java, SQL, and C++")
+print(result)
     
