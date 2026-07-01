@@ -1,5 +1,11 @@
-from fastapi import FastAPI
+
 import json
+from fastapi import FastAPI, UploadFile, File, Form
+import tempfile
+import os
+from app.ml.resume_parser import extract_text_from_pdf
+from app.ml.matcher import calculate_match
+
 
 app = FastAPI()
 
@@ -30,6 +36,35 @@ def get_jobs(q: str = "", location: str = "", source: str = "all"):
         
     return {"jobs": jobs, "total": len(jobs)}
         
-
+@app.post("/api/match")
+def match_resume(resume: UploadFile = File(...), job_url: str = Form(...)):
+    
+    # Parse text from resume
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    temp_file.write(resume.file.read())
+    temp_file.close()
+    
+    resume_text = extract_text_from_pdf(temp_file.name)
+    
+    os.remove(temp_file.name)
+    
+    # Load job data
+    with open("app/data/jobs.json", "r") as f:
+        jobs = json.load(f)
+        
+    job = None
+    for j in jobs:
+        if j["url"] == job_url:
+            job = j
+            break
+        
+    if not job:
+        return {"error": "Job not found"}
+        
+    result = calculate_match(resume_text, job["description"])
+    return result
+        
+        
+    
             
 
