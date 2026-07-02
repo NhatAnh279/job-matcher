@@ -6,6 +6,7 @@ import os
 from app.ml.resume_parser import extract_text_from_pdf
 from app.ml.matcher import calculate_match
 from app.api.auth import register_user, login_user
+from app.api.auth import supabase
 
 
 app = FastAPI()
@@ -38,7 +39,11 @@ def get_jobs(q: str = "", location: str = "", source: str = "all"):
     return {"jobs": jobs, "total": len(jobs)}
         
 @app.post("/api/match")
-def match_resume(resume: UploadFile = File(...), job_url: str = Form(...)):
+def match_resume(resume: UploadFile = File(...), job_url: str = Form(...), token: str = Form(...)):
+    
+    # User authentication
+    user = supabase.auth.get_user(token)
+    user_id = user.user.id
     
     # Parse text from resume
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -63,6 +68,14 @@ def match_resume(resume: UploadFile = File(...), job_url: str = Form(...)):
         return {"error": "Job not found"}
         
     result = calculate_match(resume_text, job["description"])
+    supabase.table("match_history").insert({
+    "user_id": user_id,
+    "job_title": job["title"],
+    "company": job["company"],
+    "score": result["score"],
+    "matched_skills": str(result["matched_skills"]),
+    "missing_skills": str(result["missing_skills"]),
+}).execute()
     return result
         
 @app.post("/api/auth/register")
