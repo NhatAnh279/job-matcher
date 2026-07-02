@@ -5,6 +5,7 @@ import tempfile
 import os
 from app.ml.resume_parser import extract_text_from_pdf
 from app.ml.matcher import calculate_match
+from app.api.auth import register_user, login_user
 
 
 app = FastAPI()
@@ -64,6 +65,21 @@ def match_resume(resume: UploadFile = File(...), job_url: str = Form(...)):
     result = calculate_match(resume_text, job["description"])
     return result
         
+@app.post("/api/auth/register")
+def register(email: str = Form(...), password: str = Form(...)):
+    try:
+        response = register_user(email, password)
+        return response
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/auth/login")
+def login(email: str = Form(...), password: str = Form(...)):
+    try:
+        response = login_user(email, password)
+        return {"user_id": response.user.id, "token": response.session.access_token}
+    except Exception as e:
+        return {"error": str(e)}
         
     
             
