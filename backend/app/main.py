@@ -7,7 +7,7 @@ from app.ml.resume_parser import extract_text_from_pdf
 from app.ml.matcher import calculate_match
 from app.api.auth import register_user, login_user
 from app.api.auth import supabase
-
+from app.ml.extractor import extract_skills
 
 app = FastAPI()
 
@@ -104,6 +104,52 @@ def get_match_history(token: str):
         return {"history": response.data}
     except Exception as e:
         return {"error": str(e)}
+    
+@app.get("/api/market-demand")
+def get_market_demand(role: str = "", location: str = ""):
+    with open("app/data/jobs.json", "r") as f:
+        jobs = json.load(f)
+        
+    # Filter jobs based on role and location
+    if role:  
+        filtered = []
+        for job in jobs:
+            if role.lower() in job["title"].lower():
+                filtered.append(job)
+        jobs = filtered
+    
+    if location:
+        filtered = []
+        for  job in jobs:
+            if location.lower() in job["location"].lower():
+                filtered.append(job)
+        jobs = filtered
+                
+    # Extract skills from the filtered jobs description
+    skills_count = {}
+    for job in jobs:
+        skills = extract_skills(job.get("description", ""))
+        for skill in skills: 
+            if skill in skills_count:
+                skills_count[skill] += 1
+            else:
+                skills_count[skill] = 1
+                
+    # Calculate percentage of skill occurence to job total
+    total_jobs = len(jobs)
+    skills_percentage = {skill: (count / total_jobs) * 100 for skill, count in skills_count.items()}
+    
+
+    sorted_skills = sorted(skills_percentage.items(), key=lambda x: x[1], reverse=True) [:15]
+    
+    return {
+        "role": role,
+        "location": location,
+        "skills": [{"name": s, "demand": round(p, 1)} for s, p in sorted_skills]
+    }
+                  
+
+        
 
         
     
