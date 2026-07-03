@@ -93,6 +93,18 @@ def login(email: str = Form(...), password: str = Form(...)):
         return {"user_id": response.user.id, "token": response.session.access_token}
     except Exception as e:
         return {"error": str(e)}
+    
+@app.get("/api/match/history")
+def get_match_history(token: str):
+    try:
+        user = supabase.auth.get_user(token)
+        user_id = user.user.id
+        
+        response = supabase.table("match_history").select("*").eq("user_id", user_id).execute()
+        return {"history": response.data}
+    except Exception as e:
+        return {"error": str(e)}
+
         
     
             
