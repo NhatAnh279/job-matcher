@@ -1201,7 +1201,40 @@ def extract_skills(text):
     
     return list(set(extracted_skills))
 
-
-
+# Highlighting skills in JD
+def highlight_skills(resume_text, jd_text):
+    resume_skills = extract_skills(resume_text)
+    jd_skills = extract_skills(jd_text)
+    
+    skill_positions = []
+    for skill in jd_skills:
+        pattern = r'\b' + re.escape(skill) + r'\b'
+        for match in re.finditer(pattern, jd_text, re.IGNORECASE):
+            highlight = "matched" if skill in resume_skills else "missing"
+            skill_positions.append({
+                "start": match.start(),
+                "end": match.end(),
+                "text": match.group(),
+                "highlight": highlight
+            })
+        
+    skill_positions.sort(key=lambda x: x["start"])
+    
+    segments = []
+    current = 0
+    
+    for pos in skill_positions:
+        if current < pos["start"]:
+            segments.append({"text": jd_text[current:pos["start"]], "highlight": None})
+        segments.append({"text": pos["text"], "highlight": pos["highlight"]})
+        current = pos["end"]
+        
+    if current < len(jd_text):
+        segments.append({"text": jd_text[current:], "highlight": None})
+    
+    return segments
+    
+    
+    
 
 
