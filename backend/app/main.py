@@ -8,6 +8,8 @@ from app.ml.matcher import calculate_match
 from app.api.auth import register_user, login_user
 from app.api.auth import supabase
 from app.ml.extractor import extract_skills
+from app.ml.best_fit import get_best_fit
+
 
 app = FastAPI()
 
@@ -148,7 +150,9 @@ def get_market_demand(role: str = "", location: str = ""):
         "skills": [{"name": s, "demand": round(p, 1)} for s, p in sorted_skills]
     }
                   
-
+@app.get("/api/best-fit")
+def best_fit(resume_text: str):
+    return {"roles": get_best_fit(resume_text)}
         
 
         
