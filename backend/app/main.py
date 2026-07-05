@@ -9,6 +9,7 @@ from app.api.auth import register_user, login_user
 from app.api.auth import supabase
 from app.ml.extractor import extract_skills
 from app.ml.best_fit import get_best_fit
+from app.ml.extractor import extract_skills, highlight_skills
 
 
 app = FastAPI()
@@ -79,7 +80,8 @@ def match_resume(resume: UploadFile = File(...), job_url: str = Form(...), token
     "missing_skills": str(result["missing_skills"]),
 }).execute()
     return result
-        
+
+# Register        
 @app.post("/api/auth/register")
 def register(email: str = Form(...), password: str = Form(...)):
     try:
@@ -88,6 +90,7 @@ def register(email: str = Form(...), password: str = Form(...)):
     except Exception as e:
         return {"error": str(e)}
 
+# Login
 @app.post("/api/auth/login")
 def login(email: str = Form(...), password: str = Form(...)):
     try:
@@ -95,7 +98,8 @@ def login(email: str = Form(...), password: str = Form(...)):
         return {"user_id": response.user.id, "token": response.session.access_token}
     except Exception as e:
         return {"error": str(e)}
-    
+
+# Return match history    
 @app.get("/api/match/history")
 def get_match_history(token: str):
     try:
@@ -106,7 +110,8 @@ def get_match_history(token: str):
         return {"history": response.data}
     except Exception as e:
         return {"error": str(e)}
-    
+
+# Get market demand for skills based on role and location    
 @app.get("/api/market-demand")
 def get_market_demand(role: str = "", location: str = ""):
     with open("app/data/jobs.json", "r") as f:
@@ -149,11 +154,29 @@ def get_market_demand(role: str = "", location: str = ""):
         "location": location,
         "skills": [{"name": s, "demand": round(p, 1)} for s, p in sorted_skills]
     }
-                  
+
+# Get best fit roles                  
 @app.get("/api/best-fit")
 def best_fit(resume_text: str):
     return {"roles": get_best_fit(resume_text)}
-        
+
+# Hilight skills in JD based on resume        
+@app.get("/api/jd-highlight")
+def jd_highlight(job_url: str, resume_text: str):
+    with open("app/data/jobs.json", "r") as f:
+        jobs = json.load(f)
+    
+    job = None
+    for j in jobs:
+        if j["url"] == job_url:
+            job = j
+            break
+    
+    if not job:
+        return {"error": "Job not found"}
+    
+    segments = highlight_skills(resume_text, job["description"])
+    return {"segments": segments}
 
         
     
