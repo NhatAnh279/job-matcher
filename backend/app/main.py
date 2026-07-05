@@ -10,6 +10,7 @@ from app.api.auth import supabase
 from app.ml.extractor import extract_skills
 from app.ml.best_fit import get_best_fit
 from app.ml.extractor import extract_skills, highlight_skills
+from app.ml.matcher import calculate_match, get_shap_scores
 
 
 app = FastAPI()
@@ -71,6 +72,7 @@ def match_resume(resume: UploadFile = File(...), job_url: str = Form(...), token
         return {"error": "Job not found"}
         
     result = calculate_match(resume_text, job["description"])
+    result["shap_scores"] = get_shap_scores(resume_text, job["description"])
     supabase.table("match_history").insert({
     "user_id": user_id,
     "job_title": job["title"],
