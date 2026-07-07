@@ -87,6 +87,7 @@ def scrape_jora(query, location, pages=3):
                 "posted_at": posted_date.text.strip() if posted_date else "",
                 "url": job_url,
                 "description": get_job_detail(job_url),
+                "source": "jora"
             }
             time.sleep(1)
             jobs.append(job)
@@ -94,12 +95,3 @@ def scrape_jora(query, location, pages=3):
     return jobs
         
 
-# JSON 
-jobs = scrape_jora("data analyst", "sydney")
-
-with open("backend/app/data/jobs.json", "w") as f:
-    json.dump(jobs, f)
-
-print(f"Saved {len(jobs)} jobs")
-
-jobs = scrape_jora("data analyst", "sydney", 1)
