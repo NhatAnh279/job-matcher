@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import time
 
 def scrape_seek(query, location, pages=3):
+    query = query.replace(" ", "-")
     jobs = []
     
     with sync_playwright() as p:
@@ -41,7 +42,8 @@ def scrape_seek(query, location, pages=3):
                 "company": company_el.get_text(strip=True) if company_el else "",
                 "location": location_el.get_text(strip=True) if location_el else "",
                 "description": description_el.get_text(strip=True) if description_el else "",
-                "url": job_url
+                "url": job_url,
+                "source": "seek"
             }
             
             jobs.append(job_data)
@@ -51,4 +53,3 @@ def scrape_seek(query, location, pages=3):
         browser.close()
     return jobs
 
-scrape_seek("data-analyst", "Sydney-NSW-2000", 1)
