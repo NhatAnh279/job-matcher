@@ -11,9 +11,8 @@ from app.ml.extractor import extract_skills
 from app.ml.best_fit import get_best_fit
 from app.ml.extractor import extract_skills, highlight_skills
 from app.ml.matcher import calculate_match, get_shap_scores
-from app.scraper.jora import scrape_jora
-from app.scraper.seek import scrape_seek
-from apscheduler.schedulers.background import BackgroundScheduler
+
+
 
 
 app = FastAPI()
@@ -183,20 +182,6 @@ def jd_highlight(job_url: str, resume_text: str):
     segments = highlight_skills(resume_text, job["description"])
     return {"segments": segments}
 
-def refresh_jobs():
-    print("Refreshing job listings...")
-    jora_jobs = scrape_jora("data analyst", "sydney", 1)
-    seek_jobs = scrape_seek("data analyst", "Sydney-NSW-2000", 1)
-    all_jobs = jora_jobs + seek_jobs
-    
-    # Save to JSON
-    with open("app/data/jobs.json", "w") as f:
-        json.dump(all_jobs, f)
-    print(f"Refreshed {len(all_jobs)} jobs")      
-    
-scheduler = BackgroundScheduler()
-scheduler.add_job(refresh_jobs, "interval", hours=24)
-scheduler.start()  
-    
+
             
 
