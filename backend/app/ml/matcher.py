@@ -1,18 +1,13 @@
 
-import requests
+from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from app.ml.extractor import extract_skills
 
-HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
-
-def sbert_encode(text):
-    response = requests.post(HF_API_URL, json={"inputs": text})
-    return response.json()
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def match_resume(resume_text, jd_text):
-    resume_vector = sbert_encode(resume_text)
-    jd_vector = sbert_encode(jd_text)
-    similarity = cosine_similarity([resume_vector], [jd_vector])[0][0]
+    embeddings = model.encode([jd_text, resume_text])
+    similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
     return round(float(similarity) * 100, 2)
 
 def calculate_match(resume_text, jd_text):
