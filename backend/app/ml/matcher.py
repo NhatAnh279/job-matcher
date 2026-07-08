@@ -1,18 +1,19 @@
-from unittest import result
 
-from sentence_transformers import SentenceTransformer
+import requests
 from sklearn.metrics.pairwise import cosine_similarity
 from app.ml.extractor import extract_skills
 
+HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
 
-# Load the pre-trained SBERT model
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
+def sbert_encode(text):
+    response = requests.post(HF_API_URL, json={"inputs": text})
+    return response.json()
 
 def match_resume(resume_text, jd_text):
-    embeddings = model.encode([jd_text, resume_text])
-    similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
-    return round(similarity * 100, 2)
+    resume_vector = sbert_encode(resume_text)
+    jd_vector = sbert_encode(jd_text)
+    similarity = cosine_similarity([resume_vector], [jd_vector])[0][0]
+    return round(float(similarity) * 100, 2)
 
 def calculate_match(resume_text, jd_text):
     # Extract skills from both resume and JD

@@ -1,14 +1,15 @@
+from app.ml.matcher import sbert_encode
+import numpy as np
 from sklearn.cluster import KMeans
-from sentence_transformers import SentenceTransformer
 import json
-model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def build_clusters():
     with open("app/data/jobs.json", "r") as f:
         jobs = json.load(f)
         
     
-    embeddings = model.encode([job["description"] for job in jobs])
+    embeddings = [sbert_encode(job["description"]) for job in jobs]
+    embeddings = np.array(embeddings)
     
     # KMeans clustering
     kmeans = KMeans(n_clusters=5, random_state=42)
@@ -41,7 +42,7 @@ def build_clusters():
 kmeans, role_names = build_clusters()        
 
 def get_best_fit(resume_text):
-    embeddings = model.encode([resume_text])
+    embeddings = np.array([sbert_encode(resume_text)])
     
     ranked_roles = []
     # Calculate distance to each cluster center
