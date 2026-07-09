@@ -13,11 +13,13 @@ export default function TiltCard({
   className = "",
   index = 0,
   max = 7,
+  onClick,
 }: {
   children: React.ReactNode;
   className?: string;
   index?: number;
   max?: number;
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
 }) {
   const reduce = useReducedMotion();
   const rx = useMotionValue(0);
@@ -39,6 +41,7 @@ export default function TiltCard({
   return (
     <motion.article
       className={className}
+      onClick={onClick}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
       initial={reduce ? false : { opacity: 0, y: 16 }}

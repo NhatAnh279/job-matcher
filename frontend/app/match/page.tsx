@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { UploadSimple, Check, X } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import AppHeader from "../_components/AppHeader";
+import BestFitCards from "../_components/BestFitCards";
 import ConfettiBurst from "../_components/ConfettiBurst";
 import ScoreArc from "../_components/ScoreArc";
 import AccentMeter from "../_components/AccentMeter";
@@ -145,7 +146,22 @@ export default function MatchPage() {
 
     const jobId = queryParam("job_id");
     if (!jobId) {
-      setError("Pick a job from the Jobs page first, then click “Match my resume” on it.");
+      // SAMPLE MODE — no job picked (opened /match directly). Run a short
+      // "analyzing" pass, then show the sample result so the flow is
+      // previewable end-to-end. A real score still needs a job from /jobs.
+      setLoading(true);
+      setBestFit([]);
+      setDemand([]);
+      setJd(null);
+      window.setTimeout(() => {
+        setResult(MOCK_MATCH);
+        setBestFit(MOCK_BESTFIT);
+        setDemand(MOCK_DEMAND);
+        setJd(MOCK_JD);
+        setLoading(false);
+        setError("Sample result. Pick a job from the Jobs page to score against a real role.");
+        toast(`Sample score ${MOCK_MATCH.score} / 100`);
+      }, 1400);
       return;
     }
 
@@ -198,10 +214,14 @@ export default function MatchPage() {
 
   return (
     <>
-      <AppHeader active="/match" />
+      {/* the logo's soul-dot reacts to the score band: green = happy bounce, red = consoling droop */}
+      <AppHeader
+        active="/match"
+        mood={result && band ? (band.key === "high" ? "happy" : band.key === "low" ? "sad" : "idle") : "idle"}
+      />
       <main className="wrap page-enter accent-match">
         <p className="eyebrow">Resume → job, scored</p>
-        <h1 className="h-display page-title">Match my resume</h1>
+        <h1 className="h-display page-title grad-text">Match my resume</h1>
 
         {/* Upload control */}
         <div className="card upload">
@@ -388,33 +408,12 @@ export default function MatchPage() {
               </div>
             </section>
 
-            {/* Best fit — separate endpoint; only shown when available */}
+            {/* Best fit — separate endpoint; only shown when available.
+                Cards expand in place with a shared layoutId morph (see BestFitCards). */}
             {bestFit.length > 0 && (
               <section className="card block">
                 <h2 className="h-display block-title">Where your skills cluster</h2>
-                <div className="fit-grid">
-                  {bestFit.map((r, i) => {
-                    const fb = scoreBand(r.fit);
-                    return (
-                      <motion.div
-                        key={r.title}
-                        className={`fit-card ${i === 0 ? "featured" : ""}`}
-                        initial={{ opacity: 0, y: 16 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, amount: 0.4 }}
-                        transition={{ duration: 0.45, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                        whileHover={{ y: -4 }}
-                      >
-                        <p className="card-meta mono">{i === 0 ? "★ Best fit" : `Rank ${i + 1}`}</p>
-                        <h3 className="fit-role">{r.title}</h3>
-                        <p className="fit-score mono" style={{ color: fb.color }}>
-                          {r.fit}<span className="fit-pct">%</span>
-                        </p>
-                        {r.note && <p className="muted fit-note">{r.note}</p>}
-                      </motion.div>
-                    );
-                  })}
-                </div>
+                <BestFitCards roles={bestFit} />
               </section>
             )}
           </div>
@@ -445,22 +444,13 @@ export default function MatchPage() {
         /* ── result hero: 3 columns (ring · skills · verdict); shared card/verdict styles live in globals.css ── */
         .result-hero { position: relative; overflow: hidden; display: grid; grid-template-columns: auto 1fr 1.05fr; gap: 18px; align-items: stretch; }
         .rh-aura { width: 320px; height: 320px; top: -150px; right: -90px; }
-        .rh-ring { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 26px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-xl); box-shadow: var(--shadow-md); }
+        .rh-ring { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 26px; background: var(--glass); backdrop-filter: blur(14px) saturate(1.35); border: 1px solid var(--glass-border); border-radius: var(--r-xl); box-shadow: var(--glass-edge), var(--shadow-md); }
         .rh-ring-inner { position: relative; display: grid; place-items: center; }
         .rh-skills { display: flex; flex-direction: column; gap: 14px; }
         @media (max-width: 860px) { .result-hero { grid-template-columns: 1fr; } }
         .bars-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-        .fit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .fit-card { position: relative; border: 1px solid var(--hairline); border-radius: var(--r-lg); padding: 22px; background: var(--surface); box-shadow: var(--shadow-sm); transition: box-shadow .25s, border-color .25s; }
-        .fit-card:hover { box-shadow: var(--shadow-md); }
-        .fit-card.featured { background: var(--accent-soft); border-color: var(--accent-line); box-shadow: var(--shadow-accent); }
+        /* best-fit card styles now live in the shared BestFitCards component */
         .card-meta { font-family: var(--font-mono), monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-        .fit-card.featured .card-meta { color: var(--accent); }
-        .fit-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 18px; margin-top: 8px; }
-        .fit-score { font-family: var(--font-mono), monospace; font-weight: 700; font-size: 38px; margin-top: 10px; line-height: 1; font-variant-numeric: tabular-nums; }
-        .fit-card.featured .fit-score { font-size: 48px; }
-        .fit-pct { font-size: 0.5em; color: var(--muted); margin-left: 2px; }
-        .fit-note { font-size: 13px; margin-top: 8px; line-height: 1.45; }
         /* ── JD highlight ── */
         .jd-arrangement { font-size: 12px; color: #9CA3AF; text-transform: capitalize; margin: -14px 0 18px; }
         .jd-text { font-size: 17px; line-height: 1.95; color: #16181D; }
@@ -477,7 +467,7 @@ export default function MatchPage() {
         .jd-resp li { font-size: 15px; color: #374151; padding-left: 18px; position: relative; }
         .jd-resp li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: #9CA3AF; }
         @media (max-width: 680px) {
-          .bars-2col, .fit-grid { grid-template-columns: 1fr; }
+          .bars-2col { grid-template-columns: 1fr; }
           .score-row { gap: 28px; }
         }
       `}</style>

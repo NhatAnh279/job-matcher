@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import ToastProvider from "./_components/ToastProvider";
+import CardMorphProvider from "./_components/CardMorph";
 import ParticleBackground from "./_components/ParticleBackground";
 import CursorFollower from "./_components/CursorFollower";
 import ButtonRipple from "./_components/ButtonRipple";
@@ -47,7 +48,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${sans.variable} ${display.variable} ${mono.variable}`}>
       <body>
         <ParticleBackground />
-        <ToastProvider>{children}</ToastProvider>
+        <CardMorphProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </CardMorphProvider>
         <CursorFollower />
         <ButtonRipple />
       </body>

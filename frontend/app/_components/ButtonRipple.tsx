@@ -1,7 +1,8 @@
 "use client";
 
-/* Phase 4 — Material-style click ripple on every .btn. One global listener
-   spawns a ripple at the click point inside the nearest .btn. */
+/* Phase 4 — Material-style click ripple on every .btn (and the
+   "Match my resume" card CTA, .act-cta). One global listener spawns
+   a ripple at the click point inside the nearest match. */
 
 import { useEffect } from "react";
 
@@ -9,7 +10,7 @@ export default function ButtonRipple() {
   useEffect(() => {
     function onClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
-      const btn = target.closest(".btn") as HTMLElement | null;
+      const btn = target.closest(".btn, .act-cta") as HTMLElement | null;
       if (!btn) return;
       const r = btn.getBoundingClientRect();
       const size = Math.max(r.width, r.height);

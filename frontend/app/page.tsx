@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { Check, X } from "@phosphor-icons/react";
 import ScoreArc from "./_components/ScoreArc";
+import BestFitCards from "./_components/BestFitCards";
+import BrandMark from "./_components/BrandMark";
 import { scoreBand } from "./_components/scoreBand";
 
 /* ════════════════════════════════════════════════════════════════
@@ -70,7 +73,12 @@ function Bar({
       <div className="bar-track">
         <div
           className="bar-fill"
-          style={{ width, background: color, transitionDelay: `${delay}ms` }}
+          style={{
+            width,
+            background: color,
+            boxShadow: `0 0 12px ${hexToRgba(color, 0.45)}`,
+            transitionDelay: `${delay}ms`,
+          }}
         />
       </div>
     </div>
@@ -81,14 +89,43 @@ function Bar({
    4. THE SIX PANELS
    ════════════════════════════════════════════════════════════════ */
 
-function HeroPanel({ active, accent, goTo }: PanelProps & { goTo: (i: number) => void }) {
+// Floating "data particles" near the hero copy: a few skill labels in faint
+// mono type, hinting that the product reads skills — no explanation needed.
+// They fade out as the deck slides away from the hero.
+const HERO_TAGS = [
+  { label: "Python",   color: "#2563EB", top: "-4%",  left: "80%", dur: 7.5, delay: 0 },
+  { label: "SQL",      color: "#0E9F6E", top: "34%",  left: "94%", dur: 8.5, delay: 1.1 },
+  { label: "Docker",   color: "#E11D48", top: "92%",  left: "82%", dur: 9.5, delay: 2.0 },
+  { label: "Power BI", color: "#D97706", top: "-14%", left: "44%", dur: 8,   delay: 0.6 },
+];
+
+function HeroPanel({ active, accent, reduced, goTo }: PanelProps & { goTo: (i: number) => void }) {
   return (
     <div className="panel-inner" style={{ maxWidth: 760 }}>
+      <div className="hero-tags" aria-hidden>
+        {HERO_TAGS.map((t) => (
+          <motion.span
+            key={t.label}
+            className="hero-tag mono"
+            style={{ top: t.top, left: t.left }}
+            animate={active && !reduced ? { opacity: 0.55, y: [0, -7, 0] } : { opacity: reduced && active ? 0.4 : 0 }}
+            transition={{
+              opacity: { duration: 0.6, delay: active ? 0.4 + t.delay * 0.25 : 0 },
+              y: { duration: t.dur, repeat: Infinity, ease: "easeInOut", delay: t.delay },
+            }}
+          >
+            <span className="hero-tag-dot" style={{ background: t.color }} />
+            {t.label}
+          </motion.span>
+        ))}
+      </div>
       <Reveal show={active}>
         <p className="eyebrow">Resume → job, scored</p>
       </Reveal>
       <Reveal show={active} delay={80}>
-        <h1 className="h-display h-hero" style={{ marginTop: 14 }}>Find the job you actually fit.</h1>
+        <h1 className="h-display h-hero" style={{ marginTop: 14 }}>
+          Find the job you <span className="grad-text accent-home">actually fit.</span>
+        </h1>
       </Reveal>
       <Reveal show={active} delay={160}>
         <p className="lead" style={{ marginTop: 18, fontSize: 18, maxWidth: 540 }}>
@@ -97,13 +134,27 @@ function HeroPanel({ active, accent, goTo }: PanelProps & { goTo: (i: number) =>
         </p>
       </Reveal>
       <Reveal show={active} delay={240}>
-        <div style={{ display: "flex", gap: 14, marginTop: 28, flexWrap: "wrap" }}>
-          <Link href="/match" className="btn btn-primary">Match my resume</Link>
+        <div style={{ display: "flex", gap: 14, marginTop: 28, flexWrap: "wrap", alignItems: "center" }}>
+          <Link href="/match" className="btn btn-primary btn-cta">Match my resume</Link>
           <Link href="/jobs" className="btn btn-ghost">Browse jobs</Link>
+          <span className="cta-note mono">Free · no card needed</span>
         </div>
       </Reveal>
-      <Reveal show={active} delay={340}>
-        <p className="hint" style={{ marginTop: 56 }}>
+      {/* proof: honest product stats before the fold (Trust & Authority pattern) */}
+      <Reveal show={active} delay={310}>
+        <div className="hero-stats">
+          <div className="stat"><b>2,000+</b><span>live roles synced daily</span></div>
+          <div className="stat"><b>~10s</b><span>from resume to score</span></div>
+          <div className="stat"><b>100%</b><span>free while in beta</span></div>
+        </div>
+      </Reveal>
+      <Reveal show={active} delay={370}>
+        <p className="trust-strip mono">
+          Live listings from Seek &amp; Jora — roles at Canva · Atlassian · Airwallex · Telstra · REA Group
+        </p>
+      </Reveal>
+      <Reveal show={active} delay={430}>
+        <p className="hint" style={{ marginTop: 34 }}>
           scroll to move <span className="nudge" style={{ color: accent }}>→</span>
         </p>
       </Reveal>
@@ -120,7 +171,10 @@ function JobsPanel({ active, accent }: PanelProps) {
   return (
     <div className="panel-inner">
       <Reveal show={active}>
-        <h2 className="h-display h-sec">Live roles from Seek &amp; Jora.</h2>
+        <p className="eyebrow">2,000+ roles · refreshed daily</p>
+      </Reveal>
+      <Reveal show={active} delay={60}>
+        <h2 className="h-display h-sec grad-text accent-jobs" style={{ marginTop: 12 }}>Live roles from Seek &amp; Jora.</h2>
       </Reveal>
       <div className="grid-3" style={{ marginTop: 32 }}>
         {JOBS.map((job, i) => (
@@ -221,7 +275,7 @@ function InsightsPanel({ active, accent, reduced }: PanelProps) {
   return (
     <div className="panel-inner">
       <Reveal show={active}>
-        <h2 className="h-display h-sec" style={{ marginBottom: 32 }}>What moved the needle.</h2>
+        <h2 className="h-display h-sec grad-text accent-insights" style={{ marginBottom: 32 }}>What moved the needle.</h2>
       </Reveal>
       <div className="split split-top">
         <Reveal show={active} delay={120} className="bar-group">
@@ -255,33 +309,22 @@ function InsightsPanel({ active, accent, reduced }: PanelProps) {
   );
 }
 
-function BestFitPanel({ active, accent }: PanelProps) {
+function BestFitPanel({ active }: PanelProps) {
+  // Same card family as the Match page: shared BestFitCards component,
+  // band-coloured numbers, and the click-to-expand layoutId morph.
   const ROLES = [
-    { role: "Data Analyst",     score: 82, lead: true },
-    { role: "Business Analyst", score: 64, lead: false },
-    { role: "Data Scientist",   score: 47, lead: false },
+    { title: "Data Analyst",     fit: 82, note: "Your skills cluster here" },
+    { title: "Business Analyst", fit: 64, note: "Close second" },
+    { title: "Data Scientist",   fit: 47, note: "Needs more ML skills" },
   ];
   return (
-    <div className="panel-inner">
+    <div className="panel-inner accent-bestfit">
       <Reveal show={active}>
-        <h2 className="h-display h-sec" style={{ marginBottom: 32 }}>Where your skills cluster.</h2>
+        <h2 className="h-display h-sec grad-text" style={{ marginBottom: 32 }}>Where your skills cluster.</h2>
       </Reveal>
-      <div className="grid-3">
-        {ROLES.map((r, i) => (
-          <Reveal key={r.role} show={active} delay={120 + i * 120}>
-            <div
-              className="card fit-card"
-              style={r.lead
-                ? { background: hexToRgba(accent, 0.12), borderColor: hexToRgba(accent, 0.4) }
-                : undefined}
-            >
-              <p className="card-meta mono">{r.lead ? "Best fit" : `Rank ${i + 1}`}</p>
-              <h3 className="card-title" style={{ marginTop: 6 }}>{r.role}</h3>
-              <p className="fit-score mono" style={{ color: accent }}>{r.score}</p>
-            </div>
-          </Reveal>
-        ))}
-      </div>
+      <Reveal show={active} delay={120}>
+        <BestFitCards roles={ROLES} />
+      </Reveal>
     </div>
   );
 }
@@ -295,7 +338,7 @@ function HistoryPanel({ active, accent }: PanelProps) {
   return (
     <div className="panel-inner">
       <Reveal show={active}>
-        <h2 className="h-display h-sec" style={{ marginBottom: 28 }}>Every match you&apos;ve run.</h2>
+        <h2 className="h-display h-sec grad-text accent-history" style={{ marginBottom: 28 }}>Every match you&apos;ve run.</h2>
       </Reveal>
       <Reveal show={active} delay={120}>
         <table className="history">
@@ -307,12 +350,26 @@ function HistoryPanel({ active, accent }: PanelProps) {
               <tr key={r.role}>
                 <td>{r.role}</td>
                 <td className="muted">{r.company}</td>
-                <td className="mono" style={{ color: accent, fontWeight: 700 }}>{r.score}</td>
+                {/* scores wear their band colour (green/amber/red) — same token as the Match ring */}
+                <td className="mono" style={{ color: scoreBand(r.score).color, fontWeight: 700 }}>{r.score}</td>
                 <td className="muted mono">{r.date}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </Reveal>
+      {/* closing conversion block — CTA repeated after the product tour */}
+      <Reveal show={active} delay={240}>
+        <div className="closing-cta">
+          <div className="closing-copy">
+            <p className="closing-quote">&ldquo;Job Fit showed me the two skills that were costing me interviews.&rdquo;</p>
+            <p className="closing-attrib mono">— Minh T., Data Analyst candidate · beta user</p>
+          </div>
+          <div className="closing-actions">
+            <Link href="/register" className="btn btn-primary btn-cta">Sign up free</Link>
+            <span className="cta-note mono">Takes 30 seconds</span>
+          </div>
+        </div>
       </Reveal>
     </div>
   );
@@ -385,11 +442,8 @@ export default function LandingPage() {
         {/* Behavior 4: logo resets to the first panel */}
         <button className="brand" onClick={() => goTo(0)} aria-label="Back to start">
           <span className="brand-mark" aria-hidden>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <rect width="28" height="28" rx="8" fill="#16181D" />
-              <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="19.6" cy="9" r="1.9" fill="#FFFFFF" />
-            </svg>
+            {/* soul-dot wears the active section's accent; cheers on the Match panel (78 = green band) */}
+            <BrandMark size={28} accent={accent} mood={index === 2 ? "happy" : "idle"} />
           </span>
           <span className="brand-name">Job Fit</span>
         </button>
@@ -415,7 +469,7 @@ export default function LandingPage() {
         <div className="nav-right">
           <span className="divider" />
           <Link href="/login" className="login-link">Log in</Link>
-          <Link href="/register" className="cta-pill">Sign up</Link>
+          <Link href="/register" className="cta-pill">Sign up free</Link>
         </div>
       </nav>
 
@@ -469,7 +523,7 @@ export default function LandingPage() {
           position: fixed; inset: 0;
           display: flex; flex-direction: column;
           height: 100vh; height: 100dvh; overflow: hidden;
-          background: #FAFAFB; color: #16181D;
+          background: transparent; color: #16181D; /* aurora backdrop shows through */
         }
 
         /* ── nav ── */
@@ -507,7 +561,13 @@ export default function LandingPage() {
         .viewport { position: relative; flex: 1; overflow: hidden; }
         .deck { display: flex; height: 100%; transition: transform .8s cubic-bezier(.76,0,.24,1); }
         .panel { position: relative; flex: 0 0 100vw; width: 100vw; height: 100%; display: flex; align-items: center; }
-        .panel-inner { width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 48px; }
+        .panel-inner { position: relative; width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 48px; }
+
+        /* ── hero skill tags — faint floating "data particles" ── */
+        .hero-tags { position: absolute; inset: 0; pointer-events: none; }
+        .hero-tag { position: absolute; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .05em; color: #6B7280; opacity: 0; white-space: nowrap; }
+        .hero-tag-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+        @media (max-width: 860px) { .hero-tag { display: none; } }
 
         /* ── type ── */
         .h-hero { font-size: clamp(40px, 7vw, 76px); }
@@ -516,6 +576,27 @@ export default function LandingPage() {
 
         /* ── buttons / hint ── */
         .hint { font-family: var(--font-mono), monospace; font-size: 13px; color: #9CA3AF; }
+
+        /* ── commercial layer: CTA emphasis + proof ── */
+        .btn-cta {
+          background: linear-gradient(100deg, #16181D 0%, #1D4ED8 130%);
+          box-shadow: 0 10px 26px -8px rgba(37, 99, 235, .55), inset 0 1px 0 rgba(255, 255, 255, .15);
+        }
+        .cta-note { font-size: 12px; color: #6B7280; }
+        .hero-stats { display: flex; gap: 32px; margin-top: 30px; flex-wrap: wrap; }
+        .stat b { font-family: var(--font-grotesk), sans-serif; font-size: 22px; font-weight: 700; display: block; line-height: 1.2; }
+        .stat span { font-size: 12.5px; color: #6B7280; }
+        .trust-strip { font-size: 11.5px; color: #9CA3AF; margin-top: 24px; letter-spacing: .04em; }
+        .closing-cta {
+          display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+          margin-top: 26px; padding: 20px 22px;
+          background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+          border: 1px solid var(--glass-border); border-radius: var(--r-lg);
+          box-shadow: var(--glass-edge), var(--shadow-sm);
+        }
+        .closing-quote { font-size: 15px; line-height: 1.5; color: #374151; max-width: 46ch; }
+        .closing-attrib { font-size: 11px; color: #9CA3AF; margin-top: 6px; }
+        .closing-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .nudge { display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
         @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
 
@@ -524,22 +605,34 @@ export default function LandingPage() {
         .card-title { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 19px; letter-spacing: -.01em; }
         .card-meta { font-size: 12px; color: #6B7280; margin-top: 4px; }
         .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-        .fit-card { border: 1px solid rgba(0,0,0,.08); }
-        .fit-score { font-size: 40px; font-weight: 700; margin-top: 14px; }
+        /* best-fit cards moved to the shared BestFitCards component */
 
         /* ── match panel (3 columns: ring · skills · verdict; card/verdict styles in globals) ── */
         .match-panel { width: 100%; }
         .match-hero { display: grid; grid-template-columns: auto 1fr 1fr; gap: 18px; align-items: stretch; margin-top: 22px; }
-        .mh-ring { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-xl); box-shadow: var(--shadow-md); }
+        .mh-ring { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; background: var(--glass); backdrop-filter: blur(14px) saturate(1.35); border: 1px solid var(--glass-border); border-radius: var(--r-xl); box-shadow: var(--glass-edge), var(--shadow-md); }
         .mh-skills { display: flex; flex-direction: column; gap: 14px; }
         .skill-label { font-family: var(--font-mono), monospace; font-size: 13px; color: #6B7280; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .06em; }
 
-        /* ── bars ── */
+        /* ── bars — segmented "energy cell" meters ── */
         .bar-group { flex: 1; }
         .bar-row { margin-bottom: 18px; }
         .bar-head { display: flex; justify-content: space-between; font-family: var(--font-mono), monospace; font-size: 13px; margin-bottom: 6px; }
-        .bar-track { height: 10px; border-radius: 9999px; background: rgba(0,0,0,.06); overflow: hidden; }
-        .bar-fill { height: 100%; width: 0; border-radius: 9999px; transition: width .9s cubic-bezier(.22,1,.36,1); }
+        .bar-track { position: relative; height: 12px; border-radius: 6px; background: rgba(0,0,0,.05); border: 1px solid rgba(0,0,0,.06); overflow: hidden; }
+        .bar-fill { position: relative; height: 100%; width: 0; border-radius: 5px; transition: width .9s cubic-bezier(.22,1,.36,1); }
+        .bar-fill::after {
+          content: ""; position: absolute; inset: 0; border-radius: inherit;
+          background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,.5) 50%, transparent 70%);
+          background-size: 250% 100%;
+          background-position: 200% 0;
+          animation: barSheen 2.8s ease-in-out infinite;
+        }
+        @keyframes barSheen { to { background-position: -50% 0; } }
+        /* segment slits over track + fill = instrument-panel cell look */
+        .bar-track::after {
+          content: ""; position: absolute; inset: 0; pointer-events: none;
+          background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(250,250,251,.9) 14px 16px);
+        }
 
         /* ── history table ── */
         .history { width: 100%; border-collapse: collapse; font-size: 16px; }

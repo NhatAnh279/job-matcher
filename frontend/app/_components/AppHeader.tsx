@@ -3,12 +3,16 @@
 /* ════════════════════════════════════════════════════════════════
    APP HEADER — the top bar shown on every logged-in page
    (Jobs, Match, History). The landing page has its own nav.
-   `active` highlights the current link in that page's accent color.
+   The accent pill SLIDES between nav items: it rests on the active
+   link and follows the hovered one (Framer Motion layoutId).
    This folder starts with "_" so Next.js does NOT treat it as a route.
    ════════════════════════════════════════════════════════════════ */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { motion } from "framer-motion";
+import BrandMark, { type Mood } from "./BrandMark";
 
 const LINKS = [
   { href: "/jobs",    label: "Jobs",    accent: "#2563EB" },
@@ -16,8 +20,13 @@ const LINKS = [
   { href: "/history", label: "History", accent: "#E11D48" },
 ];
 
-export default function AppHeader({ active }: { active?: string }) {
+export default function AppHeader({ active, mood = "idle" }: { active?: string; mood?: Mood }) {
   const router = useRouter();
+  // the pill sits on the hovered link; falls back to the active route
+  const [hovered, setHovered] = useState<string | null>(null);
+  const pillOn = hovered ?? active;
+  // the mascot dot wears the active page's accent
+  const accent = LINKS.find((l) => l.href === active)?.accent ?? "#16181D";
 
   function logout() {
     localStorage.removeItem("token"); // clear the saved login token
@@ -27,25 +36,31 @@ export default function AppHeader({ active }: { active?: string }) {
   return (
     <header className="app-header">
       <Link href="/" className="brand" aria-label="Job Fit home">
-        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-          <rect width="28" height="28" rx="8" fill="#16181D" />
-          <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="19.6" cy="9" r="1.9" fill="#FFFFFF" />
-        </svg>
+        <BrandMark size={26} accent={accent} mood={mood} />
         <span className="brand-name">Job Fit</span>
       </Link>
 
-      <nav className="app-links">
+      <nav className="app-links" onMouseLeave={() => setHovered(null)}>
         {LINKS.map((l) => {
           const isActive = active === l.href;
+          const hasPill = pillOn === l.href;
           return (
             <Link
               key={l.href}
               href={l.href}
               className="app-link"
-              style={isActive ? { color: l.accent, background: `${l.accent}1f` } : undefined}
+              onMouseEnter={() => setHovered(l.href)}
+              style={{ color: isActive ? l.accent : undefined }}
             >
-              {l.label}
+              {hasPill && (
+                <motion.span
+                  layoutId="nav-pill"
+                  className="nav-pill"
+                  style={{ background: `${l.accent}1f` }}
+                  transition={{ type: "spring", stiffness: 450, damping: 34 }}
+                />
+              )}
+              <span className="app-link-label">{l.label}</span>
             </Link>
           );
         })}
@@ -65,11 +80,14 @@ export default function AppHeader({ active }: { active?: string }) {
         .brand-name { font-family: var(--font-grotesk), sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -.01em; }
         .app-links { display: flex; align-items: center; gap: 4px; margin-left: auto; }
         .app-link {
+          position: relative;
           font-size: 14px; font-weight: 500; color: #6B7280;
           padding: 7px 14px; border-radius: 9999px;
-          transition: color .2s, background .2s;
+          transition: color .2s;
         }
         .app-link:hover { color: #16181D; }
+        .nav-pill { position: absolute; inset: 0; border-radius: 9999px; }
+        .app-link-label { position: relative; z-index: 1; }
         .logout { font-size: 14px; color: #6B7280; background: none; border: none; }
         .logout:hover { color: #16181D; }
         @media (max-width: 640px) {

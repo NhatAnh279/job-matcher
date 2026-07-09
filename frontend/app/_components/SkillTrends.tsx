@@ -55,6 +55,15 @@ export default function SkillTrends() {
       </div>
 
       <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Skill demand trends line chart">
+        <defs>
+          {SERIES.map((s, si) => (
+            <linearGradient key={si} id={`trend-area-${si}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity="0.20" />
+              <stop offset="100%" stopColor={s.color} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
+
         {/* horizontal gridlines + y labels */}
         {gridLines.map((g) => (
           <g key={g}>
@@ -68,11 +77,34 @@ export default function SkillTrends() {
           <text key={m} x={x(i)} y={H - 8} className="axis-label" textAnchor="middle">{m}</text>
         ))}
 
-        {/* one line + dots per skill */}
+        {/* one area + glow + line + dots per skill */}
         {SERIES.map((s, si) => {
           const d = s.points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(p)}`).join(" ");
+          const area = `${d} L ${x(s.points.length - 1)} ${y(0)} L ${x(0)} ${y(0)} Z`;
+          const last = s.points.length - 1;
           return (
             <g key={s.name}>
+              {/* gradient wash under the line */}
+              <path
+                d={area}
+                fill={`url(#trend-area-${si})`}
+                style={{
+                  opacity: reduced ? 1 : 0,
+                  animation: reduced ? "none" : `fadeArea .8s ease forwards ${0.5 + si * 0.18}s`,
+                }}
+              />
+              {/* soft glow underlay */}
+              <path
+                d={d}
+                className="line-glow"
+                pathLength={1}
+                stroke={s.color}
+                style={{
+                  strokeDasharray: 1,
+                  strokeDashoffset: reduced ? 0 : 1,
+                  animation: reduced ? "none" : `draw 1.1s ease forwards ${si * 0.18}s`,
+                }}
+              />
               <path
                 d={d}
                 className="line"
@@ -87,13 +119,22 @@ export default function SkillTrends() {
               {s.points.map((p, i) => (
                 <circle key={i} cx={x(i)} cy={y(p)} r={3.5} fill="#fff" stroke={s.color} strokeWidth={2} />
               ))}
+              {/* radar ping on the latest reading — the data reads as live */}
+              {!reduced && (
+                <circle
+                  className="ping"
+                  cx={x(last)} cy={y(s.points[last])} r={5}
+                  stroke={s.color}
+                  style={{ animationDelay: `${1.3 + si * 0.4}s` }}
+                />
+              )}
             </g>
           );
         })}
       </svg>
 
       <style>{`
-        .trends { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 16px; padding: 24px; }
+        .trends { background: var(--glass); backdrop-filter: blur(14px) saturate(1.35); border: 1px solid var(--glass-border); border-radius: 16px; padding: 24px; box-shadow: var(--glass-edge), 0 1px 2px rgba(0,0,0,.04); }
         .trends-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
         .trends-title { font-size: 20px; }
         .trends-sub { font-size: 14px; margin-top: 6px; max-width: 48ch; line-height: 1.5; }
@@ -101,10 +142,22 @@ export default function SkillTrends() {
         .legend-item { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono), monospace; font-size: 12px; color: #6B7280; }
         .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
         .chart { width: 100%; height: auto; display: block; }
-        .grid { stroke: rgba(0,0,0,.07); stroke-width: 1; }
+        .grid { stroke: rgba(0,0,0,.08); stroke-width: 1; stroke-dasharray: 3 5; }
         .axis-label { font-family: var(--font-mono), monospace; font-size: 11px; fill: #9CA3AF; }
         .line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+        .line-glow { fill: none; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .16; }
+        .ping {
+          fill: none; stroke-width: 2; opacity: 0;
+          transform-box: fill-box; transform-origin: center;
+          animation: ping 2.6s ease-out infinite;
+        }
         @keyframes draw { to { stroke-dashoffset: 0; } }
+        @keyframes fadeArea { to { opacity: 1; } }
+        @keyframes ping {
+          0%   { transform: scale(.5); opacity: .8; }
+          70%  { transform: scale(2.6); opacity: 0; }
+          100% { transform: scale(2.6); opacity: 0; }
+        }
       `}</style>
     </div>
   );

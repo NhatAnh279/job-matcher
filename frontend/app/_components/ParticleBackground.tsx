@@ -1,15 +1,29 @@
 "use client";
 
-/* Phase 5 — ambient particle system + floating blurred orbs.
-   Fixed behind all content, pointer-events none, very subtle. */
+/* Phase 5 — ambient particle drift, fixed behind all content.
+   The blurred colour wash now lives in globals.css (aurora backdrop);
+   this layer only adds the floating dots on top of it.
+   Dots are generated AFTER mount so the server renders nothing and
+   hydration stays clean (Math.random() differs per render).
+   The whole layer also parallaxes gently AGAINST the mouse for depth. */
 
-import { motion, useReducedMotion } from "framer-motion";
-import { useMemo } from "react";
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
+import { useEffect, useState } from "react";
+
+type Dot = { id: number; left: number; top: number; size: number; dur: number; dx: number; dy: number };
 
 export default function ParticleBackground() {
   const reduce = useReducedMotion();
-  const dots = useMemo(
-    () =>
+  const [dots, setDots] = useState<Dot[]>([]);
+
+  // mouse position -1..1 -> small opposite-direction drift (depth cue)
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const px = useSpring(useTransform(mx, (v) => v * -14), { stiffness: 50, damping: 20 });
+  const py = useSpring(useTransform(my, (v) => v * -10), { stiffness: 50, damping: 20 });
+
+  useEffect(() => {
+    setDots(
       Array.from({ length: 14 }, (_, i) => ({
         id: i,
         left: Math.random() * 100,
@@ -18,17 +32,23 @@ export default function ParticleBackground() {
         dur: 9 + Math.random() * 12,
         dx: (Math.random() - 0.5) * 40,
         dy: -20 - Math.random() * 40,
-      })),
-    []
-  );
+      }))
+    );
+  }, []);
 
-  if (reduce) return null;
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      mx.set((e.clientX / window.innerWidth) * 2 - 1);
+      my.set((e.clientY / window.innerHeight) * 2 - 1);
+    }
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [mx, my]);
+
+  if (reduce || dots.length === 0) return null;
 
   return (
-    <div aria-hidden className="particles">
-      <span className="orb orb-1" />
-      <span className="orb orb-2" />
-      <span className="orb orb-3" />
+    <motion.div aria-hidden className="particles" style={{ x: px, y: py }}>
       {dots.map((d) => (
         <motion.span
           key={d.id}
@@ -39,15 +59,9 @@ export default function ParticleBackground() {
         />
       ))}
       <style>{`
-        .particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        .particles { position: fixed; inset: -20px; z-index: 0; pointer-events: none; overflow: hidden; will-change: transform; }
         .particle { position: absolute; border-radius: 50%; background: #2563eb; opacity: 0.15; will-change: transform; }
-        .orb { position: absolute; border-radius: 50%; filter: blur(64px); opacity: 0.12; will-change: transform; }
-        .orb-1 { width: 360px; height: 360px; background: #93c5fd; top: -90px; left: -70px; animation: orbA 17s ease-in-out infinite; }
-        .orb-2 { width: 320px; height: 320px; background: #c4b5fd; bottom: -100px; right: -60px; animation: orbB 21s ease-in-out infinite; }
-        .orb-3 { width: 280px; height: 280px; background: #a7f3d0; top: 42%; right: 10%; animation: orbA 24s ease-in-out infinite; }
-        @keyframes orbA { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(34px,22px) scale(1.1); } }
-        @keyframes orbB { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-34px,-22px) scale(1.08); } }
       `}</style>
-    </div>
+    </motion.div>
   );
 }

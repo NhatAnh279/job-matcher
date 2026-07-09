@@ -39,11 +39,14 @@ export default function ScoreArc({
   const pct = Math.max(0, Math.min(100, value)) / 100;
   const dash = C * pct;
   const ang = (-90 + pct * 360) * (Math.PI / 180);
-  const tx = cx + r * Math.cos(ang);
-  const ty = cy + r * Math.sin(ang);
+  const tx = Math.round((cx + r * Math.cos(ang)) * 100) / 100;
+  const ty = Math.round((cy + r * Math.sin(ang)) * 100) / 100;
   const count = useCountUp(value, reduce);
 
-  // gauge tick marks just inside the track
+  // gauge tick marks just inside the track. Coordinates are rounded to 2dp:
+  // full float precision differs between the server and browser Math libs
+  // by ~1e-13, which triggers React hydration-mismatch warnings.
+  const r2 = (v: number) => Math.round(v * 100) / 100;
   const tickEls = [];
   if (ticks) {
     const n = 48;
@@ -55,8 +58,8 @@ export default function ScoreArc({
       tickEls.push(
         <line
           key={i}
-          x1={cx + rOut * Math.cos(a)} y1={cy + rOut * Math.sin(a)}
-          x2={cx + rIn * Math.cos(a)} y2={cy + rIn * Math.sin(a)}
+          x1={r2(cx + rOut * Math.cos(a))} y1={r2(cy + rOut * Math.sin(a))}
+          x2={r2(cx + rIn * Math.cos(a))} y2={r2(cy + rIn * Math.sin(a))}
           stroke={major ? "rgba(0,0,0,.22)" : "rgba(0,0,0,.1)"}
           strokeWidth={major ? 1.5 : 1}
         />
@@ -82,8 +85,21 @@ export default function ScoreArc({
             <feGaussianBlur stdDeviation="3.2" result="b" />
             <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
+          <filter id={`halo-${uid}`} x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
         </defs>
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(0,0,0,.06)" strokeWidth={thickness} />
+        {/* soft light bleed under the arc — the score reads as lit from within */}
+        <motion.circle
+          cx={cx} cy={cy} r={r} fill="none" stroke="var(--accent)" strokeWidth={thickness} strokeLinecap="round"
+          opacity={0.4} filter={`url(#halo-${uid})`}
+          transform={`rotate(-90 ${cx} ${cy})`}
+          strokeDasharray={C}
+          initial={{ strokeDashoffset: reduce ? C - dash : C }}
+          animate={{ strokeDashoffset: C - dash }}
+          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+        />
         <motion.circle
           cx={cx} cy={cy} r={r} fill="none" stroke={`url(#grad-${uid})`} strokeWidth={thickness} strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cy})`}
@@ -110,7 +126,13 @@ export default function ScoreArc({
 
       <style>{`
         .scorearc { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
-        .scorearc svg { transform: translateZ(0); }
+        /* orbiting dashed halo — slow radar sweep around the gauge */
+        .scorearc::before {
+          content: ""; position: absolute; inset: -9px; border-radius: 50%;
+          border: 1px dashed var(--accent); opacity: 0.3;
+          animation: spin 30s linear infinite;
+        }
+        .scorearc svg { position: relative; transform: translateZ(0); }
         .scorearc-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
         .scorearc-num { font-family: var(--font-mono), monospace; font-weight: 700; font-size: ${Math.round(size * 0.26)}px; line-height: 1; color: var(--ink); }
         .scorearc-suffix { font-size: 12px; color: var(--muted); margin-top: 4px; }

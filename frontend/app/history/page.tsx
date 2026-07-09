@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+import { CaretDown } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import AppHeader from "../_components/AppHeader";
 import SkillTrends from "../_components/SkillTrends";
+import ScoreArc from "../_components/ScoreArc";
 import { scoreBand } from "../_components/scoreBand";
 import { useRequireAuth } from "../_components/useRequireAuth";
 
@@ -23,6 +26,9 @@ export default function HistoryPage() {
   const reduce = useReducedMotion();
   const [rows, setRows] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  // transient press feedback: the clicked row shakes + flashes its accent
+  const [pulse, setPulse] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +53,7 @@ export default function HistoryPage() {
       <AppHeader active="/history" />
       <main className="wrap page-enter accent-history">
         <p className="eyebrow">Your activity</p>
-        <h1 className="h-display page-title">Match history</h1>
+        <h1 className="h-display page-title grad-text">Match history</h1>
 
         {loading ? (
           <div className="card table-wrap">
@@ -80,25 +86,66 @@ export default function HistoryPage() {
               <tbody>
                 {rows.map((r, i) => {
                   const b = scoreBand(r.score);
+                  const isOpen = expanded === r.match_id;
                   return (
-                    <motion.tr
-                      key={r.match_id}
-                      initial={reduce ? false : { opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.35, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                    >
-                      <td className="role">{r.job_title}</td>
-                      <td className="muted">{r.company}</td>
-                      <td className="num">
-                        <span className="score-cell">
-                          <span className="score-bar">
-                            <span className="score-bar-fill" style={{ width: `${r.score}%`, background: b.color }} />
+                    <Fragment key={r.match_id}>
+                      <motion.tr
+                        className={`hist-row ${isOpen ? "open" : ""}`}
+                        onClick={() => {
+                          setExpanded(isOpen ? null : r.match_id);
+                          if (!reduce) {
+                            setPulse(r.match_id);
+                            window.setTimeout(() => setPulse((p) => (p === r.match_id ? null : p)), 500);
+                          }
+                        }}
+                        initial={reduce ? false : { opacity: 0, y: 8 }}
+                        animate={pulse === r.match_id
+                          ? {
+                              opacity: 1, y: 0,
+                              x: [0, -3, 3, -1, 0],
+                              backgroundColor: ["rgba(225,29,72,0)", "rgba(225,29,72,0.09)", "rgba(225,29,72,0)"],
+                            }
+                          : { opacity: 1, y: 0, x: 0 }}
+                        transition={pulse === r.match_id
+                          ? { duration: 0.45, ease: "easeOut" }
+                          : { duration: 0.35, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <td className="role">{r.job_title}</td>
+                        <td className="muted">{r.company}</td>
+                        <td className="num">
+                          <span className="score-cell">
+                            <span className="score-bar">
+                              <span className="score-bar-fill" style={{ width: `${r.score}%`, background: b.color, boxShadow: `0 0 8px ${b.color}66` }} />
+                            </span>
+                            <span className="score-val mono" style={{ color: b.color }}>{r.score}</span>
                           </span>
-                          <span className="score-val mono" style={{ color: b.color }}>{r.score}</span>
-                        </span>
-                      </td>
-                      <td className="num muted mono">{r.matched_at}</td>
-                    </motion.tr>
+                        </td>
+                        <td className="num muted mono">
+                          <span className="date-cell">{r.matched_at}<CaretDown className={`hist-caret ${isOpen ? "up" : ""}`} size={12} weight="bold" /></span>
+                        </td>
+                      </motion.tr>
+                      {isOpen && (
+                        <tr className="hd-row">
+                          <td colSpan={4} className="hd-cell">
+                            <motion.div
+                              className="hist-detail"
+                              initial={reduce ? false : { height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                            >
+                              <div className="hd-inner">
+                                <ScoreArc value={r.score} size={96} thickness={9} suffix="" accentColor={b.color} ariaLabel={`Score ${r.score}`} />
+                                <div className="hd-body">
+                                  <p className="card-label">{r.job_title} · {r.company}</p>
+                                  <p className="hd-meta mono">Scored {r.matched_at} · <span style={{ color: b.color, fontWeight: 700 }}>{b.key === "high" ? "Strong" : b.key === "mid" ? "Partial" : "Weak"} match</span></p>
+                                  <Link href="/match" className="btn btn-primary hd-btn">See full breakdown →</Link>
+                                </div>
+                              </div>
+                            </motion.div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -132,6 +179,17 @@ export default function HistoryPage() {
         .state { padding: 40px 0; }
         .sk-cell { display: inline-block; height: 14px; max-width: 100%; }
         .trends-block { margin-top: 28px; }
+        /* expandable rows */
+        .hist-row { cursor: pointer; }
+        .date-cell { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+        .hist-caret { color: var(--muted); transition: transform .2s; }
+        .hist-caret.up { transform: rotate(180deg); }
+        .history .hd-row td { padding: 0; border-top: none; }
+        .hist-detail { overflow: hidden; }
+        .hd-inner { display: flex; align-items: center; gap: 22px; padding: 6px 0 22px; }
+        .hd-body { display: flex; flex-direction: column; }
+        .hd-meta { font-size: 12px; color: var(--muted); margin: 6px 0 14px; }
+        .hd-btn { align-self: flex-start; }
       `}</style>
     </>
   );

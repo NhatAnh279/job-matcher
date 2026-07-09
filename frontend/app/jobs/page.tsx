@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MagnifyingGlass, MapPin, CaretDown, Star, X, Check, Funnel, Stack, Brain, ChartBar, ChartPieSlice, Code, Cloud, PenNib, Megaphone, Wallet } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import AppHeader from "../_components/AppHeader";
 import TiltCard from "../_components/TiltCard";
+import JobDrawer from "../_components/JobDrawer";
+import { useCardMorph } from "../_components/CardMorph";
+import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "../_components/ToastProvider";
 import { useRequireAuth } from "../_components/useRequireAuth";
 
@@ -147,15 +151,16 @@ const MOCK_JOBS: Job[] = [
 
 /* ── Occupation fields: the category cards (top row) + occupation checkboxes
    (left column) both filter on this dimension. Each job is bucketed by role. ── */
+// Each field gets its own colour so the category row reads like a palette.
 const FIELDS = [
-  { key: "Data Science & ML",     icon: Brain },
-  { key: "Data & Analytics",      icon: ChartBar },
-  { key: "Business Intelligence", icon: ChartPieSlice },
-  { key: "Engineering",           icon: Code },
-  { key: "Cloud & DevOps",        icon: Cloud },
-  { key: "Product & Design",      icon: PenNib },
-  { key: "Marketing & Growth",    icon: Megaphone },
-  { key: "Finance & Operations",  icon: Wallet },
+  { key: "Data Science & ML",     icon: Brain,         color: "#7C3AED" },
+  { key: "Data & Analytics",      icon: ChartBar,      color: "#2563EB" },
+  { key: "Business Intelligence", icon: ChartPieSlice, color: "#0E9F6E" },
+  { key: "Engineering",           icon: Code,          color: "#EA580C" },
+  { key: "Cloud & DevOps",        icon: Cloud,         color: "#0891B2" },
+  { key: "Product & Design",      icon: PenNib,        color: "#DB2777" },
+  { key: "Marketing & Growth",    icon: Megaphone,     color: "#F59E0B" },
+  { key: "Finance & Operations",  icon: Wallet,        color: "#0D9488" },
 ] as const;
 
 function fieldOf(job: Job): string {
@@ -245,11 +250,33 @@ export default function JobsPage() {
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
+  // job detail drawer
+  const [openJob, setOpenJob] = useState<Job | null>(null);
+
   // typewriter slogan
   const [typed, setTyped] = useState("");
   const [reduced, setReduced] = useState(false);
 
+  // "press to radiate" departure: which card is bursting its pills
+  const [leaving, setLeaving] = useState<string | null>(null);
+
   const toast = useToast();
+  const router = useRouter();
+  const { morphFrom } = useCardMorph();
+
+  // Card click -> pills burst outward, the card morphs into a full-screen
+  // glass panel, and the route changes to Match with this job underneath.
+  // Reduced motion: plain navigation, no effects. Same URL either way.
+  function launchToMatch(job: Job, el: HTMLElement) {
+    const href = `/match?job_id=${encodeURIComponent(job.id)}&role=${encodeURIComponent(job.role)}`;
+    if (reduced) { router.push(href); return; }
+    if (leaving) return; // one departure at a time
+    setLeaving(job.id);
+    window.setTimeout(() => {
+      morphFrom(el, { accent: "#0E9F6E", title: job.role, subtitle: job.company });
+      window.setTimeout(() => router.push(href), 240);
+    }, 220);
+  }
 
   // GET /api/jobs -> map the contract response onto the card shape.
   // Falls back to mock data if the backend is offline.
@@ -359,6 +386,23 @@ export default function JobsPage() {
     update(next);
   }
 
+  // Active-filter chips (each removable) + clear-all.
+  const chips: { key: string; label: string; clear: () => void }[] = [];
+  if (keyword) chips.push({ key: "kw", label: `"${keyword}"`, clear: () => setKeyword("") });
+  if (location) chips.push({ key: "loc", label: location, clear: () => setLocation("") });
+  if (pay !== "Any pay") chips.push({ key: "pay", label: pay, clear: () => setPay("Any pay") });
+  if (empType !== "Any type") chips.push({ key: "emp", label: empType, clear: () => setEmpType("Any type") });
+  if (remote !== "Anywhere") chips.push({ key: "rem", label: remote, clear: () => setRemote("Anywhere") });
+  if (classification !== "All fields") chips.push({ key: "cls", label: classification, clear: () => setClassification("All fields") });
+  if (listing !== "Any time") chips.push({ key: "lst", label: listing, clear: () => setListing("Any time") });
+  selectedFields.forEach((f) => chips.push({ key: `f-${f}`, label: f, clear: () => toggleField(f) }));
+
+  function clearAll() {
+    setKeyword(""); setLocation(""); setPay("Any pay"); setEmpType("Any type");
+    setRemote("Anywhere"); setClassification("All fields"); setListing("Any time");
+    setSelectedFields(new Set());
+  }
+
   if (!authed) return null; // redirecting to /login
 
   return (
@@ -420,8 +464,8 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <main className="wrap page-enter">
-        {/* ── first row: profession / field quick-pick cards ── */}
+      <main className="wrap page-enter accent-jobs">
+        {/* ── first row: profession / field quick-pick cards (each has its colour) ── */}
         <div className="cat-row">
           <button
             className={`cat ${selectedFields.size === 0 ? "cat-on" : ""}`}
@@ -438,8 +482,14 @@ export default function JobsPage() {
                 key={f.key}
                 className={`cat ${on ? "cat-on" : ""}`}
                 onClick={() => pickField(f.key)}
+                style={on ? { borderColor: f.color } : undefined}
               >
-                <span className="cat-ic"><Icon size={22} /></span>
+                <span
+                  className="cat-ic"
+                  style={on ? { background: f.color, color: "#fff" } : { background: `${f.color}16`, color: f.color }}
+                >
+                  <Icon size={22} weight="duotone" />
+                </span>
                 <span className="cat-label">{f.key}</span>
               </button>
             );
@@ -453,6 +503,30 @@ export default function JobsPage() {
           <Dropdown label="Remote" value={remote} onChange={setRemote} options={["Anywhere", "Remote", "Hybrid", "On-site"]} />
           <Dropdown label="Classification" value={classification} onChange={setClassification} options={["All fields", "Data & Analytics", "Engineering"]} />
           <Dropdown label="Listing time" value={listing} onChange={setListing} options={["Any time", "Today", "Last 3 days", "Last 7 days"]} />
+        </div>
+
+        {/* ── active filter chips + live result count ── */}
+        <div className="result-bar">
+          <p className="result-count mono">{filtered.length} {filtered.length === 1 ? "job" : "jobs"}</p>
+          <div className="chips">
+            <AnimatePresence initial={false}>
+              {chips.map((c) => (
+                <motion.button
+                  key={c.key}
+                  className="chip"
+                  onClick={c.clear}
+                  layout
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  {c.label} <X size={12} weight="bold" />
+                </motion.button>
+              ))}
+            </AnimatePresence>
+            {chips.length > 0 && <button className="clear-all" onClick={clearAll}>Clear all</button>}
+          </div>
         </div>
 
         {/* hidden notice */}
@@ -473,7 +547,14 @@ export default function JobsPage() {
                   <li key={f.key}>
                     <label className="occ-item">
                       <input type="checkbox" checked={checked} onChange={() => toggleField(f.key)} />
-                      <span className="occ-box" aria-hidden>{checked && <Check size={11} weight="bold" />}</span>
+                      <span
+                        className="occ-box"
+                        aria-hidden
+                        style={checked ? { background: f.color, borderColor: f.color } : undefined}
+                      >
+                        {checked && <Check size={11} weight="bold" />}
+                      </span>
+                      <span className="occ-dot" style={{ background: f.color }} aria-hidden />
                       <span className="occ-label">{f.key}</span>
                       <span className="occ-count">{fieldCounts[f.key] ?? 0}</span>
                     </label>
@@ -516,14 +597,32 @@ export default function JobsPage() {
             <div className="results">
               {filtered.map((job, i) => {
                 const isSaved = saved.has(job.id);
+                const isLeaving = leaving === job.id;
                 return (
-                  <TiltCard key={job.id} className="card job-card" index={i}>
+                  <TiltCard key={job.id} className="card job-card clickable" index={i} onClick={(e) => launchToMatch(job, e.currentTarget as HTMLElement)}>
                     <div className="job-head">
                       <div>
                         <h3 className="job-role">{job.role}</h3>
                         <p className="job-company">{job.company}</p>
                       </div>
-                      <span className="logo">{job.company[0]}</span>
+                      {/* card click now departs to Match, so the logo opens the quick-view drawer */}
+                      <span
+                        className="logo"
+                        role="button"
+                        tabIndex={0}
+                        title="Quick view"
+                        aria-label={`Quick view ${job.role} at ${job.company}`}
+                        onClick={(e) => { e.stopPropagation(); setOpenJob(job); }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOpenJob(job);
+                          }
+                        }}
+                      >
+                        {job.company[0]}
+                      </span>
                     </div>
 
                     <div className="tag-row">
@@ -540,7 +639,22 @@ export default function JobsPage() {
                     )}
 
                     <div className="pill-row">
-                      {job.skills.map((s) => <span key={s} className="pill">{s}</span>)}
+                      {/* on departure the pills "radiate" outward before the card morphs away */}
+                      {job.skills.map((s, pi) => {
+                        const a = (pi / Math.max(job.skills.length, 1)) * Math.PI * 2 - Math.PI / 2 + 0.6;
+                        return (
+                          <motion.span
+                            key={s}
+                            className="pill"
+                            animate={isLeaving
+                              ? { x: Math.cos(a) * 28, y: Math.sin(a) * 20 - 8, opacity: 0, scale: 1.25 }
+                              : { x: 0, y: 0, opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.3, ease: "easeOut", delay: isLeaving ? pi * 0.04 : 0 }}
+                          >
+                            {s}
+                          </motion.span>
+                        );
+                      })}
                     </div>
 
                     <div className="job-foot">
@@ -549,7 +663,8 @@ export default function JobsPage() {
                         <button
                           className="act"
                           data-on={isSaved}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             toggle(saved, job.id, setSaved);
                             toast(isSaved ? "Removed from saved" : "Saved to your list");
                           }}
@@ -559,7 +674,8 @@ export default function JobsPage() {
                         </button>
                         <button
                           className="act"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             toggle(hidden, job.id, setHidden);
                             toast(`${job.role} hidden`);
                           }}
@@ -569,6 +685,13 @@ export default function JobsPage() {
                         <Link
                           href={`/match?job_id=${encodeURIComponent(job.id)}&role=${encodeURIComponent(job.role)}`}
                           className="act act-cta"
+                          onClick={(e) => {
+                            // same radiate departure as the card itself (ripple comes from ButtonRipple)
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const card = (e.currentTarget as HTMLElement).closest(".job-card") as HTMLElement;
+                            launchToMatch(job, card ?? (e.currentTarget as HTMLElement));
+                          }}
                         >
                           Match my resume →
                         </Link>
@@ -605,12 +728,14 @@ export default function JobsPage() {
         </div>
       </main>
 
+      <JobDrawer job={openJob} onClose={() => setOpenJob(null)} />
+
       <style>{`
         /* fonts: explicit Inter / Space Grotesk so nothing falls back to ui-sans-serif */
         .band, .wrap { font-family: var(--font-sans), sans-serif; }
 
         /* ── search band ── */
-        .band { background: #fff; border-bottom: 1px solid rgba(0,0,0,.08); }
+        .band { position: relative; z-index: 15; background: #fff; border-bottom: 1px solid rgba(0,0,0,.08); }
         .band-inner { max-width: 1100px; margin: 0 auto; padding: 20px 24px; display: flex; gap: 12px; flex-wrap: wrap; }
         .field { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid rgba(0,0,0,.16); border-radius: 10px; background: #fff; transition: border-color .2s, box-shadow .2s; }
         .field:focus-within { border-color: #16181D; box-shadow: 0 0 0 3px rgba(0,0,0,.06); }
@@ -628,7 +753,7 @@ export default function JobsPage() {
 
         /* ── layout ── */
         .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 24px 80px; }
-        .filters { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+        .filters { position: relative; z-index: 5; display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
         .dd { position: relative; }
         .dd-btn { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #374151; background: #fff; border: 1px solid rgba(0,0,0,.16); padding: 9px 16px; border-radius: 9999px; transition: transform .15s, border-color .2s, background .2s; }
         .dd-btn:hover { transform: translateY(-1px); border-color: #16181D; background: rgba(0,0,0,.02); }
@@ -637,6 +762,14 @@ export default function JobsPage() {
         .dd-opt { display: block; width: 100%; text-align: left; font-size: 14px; padding: 9px 12px; border: none; background: none; border-radius: 8px; transition: background .15s; }
         .dd-opt:hover { background: rgba(0,0,0,.05); }
 
+        /* result bar: live count + removable filter chips */
+        .result-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+        .result-count { font-size: 13px; font-weight: 700; color: var(--ink); }
+        .chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #2563EB; background: rgba(37,99,235,.1); border: 1px solid rgba(37,99,235,.2); padding: 5px 10px; border-radius: 9999px; transition: background .15s; }
+        .chip:hover { background: rgba(37,99,235,.18); }
+        .clear-all { font-size: 12px; font-weight: 600; color: #6B7280; background: none; border: none; text-decoration: underline; padding: 4px 6px; }
+        .clear-all:hover { color: #16181D; }
         .hidden-note { font-size: 13px; color: #6B7280; margin-bottom: 16px; }
         .link-btn { background: none; border: none; color: #16181D; font-weight: 600; font-size: 13px; text-decoration: underline; }
 
@@ -662,6 +795,7 @@ export default function JobsPage() {
         .occ-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid rgba(0,0,0,.25); display: grid; place-items: center; color: #fff; flex: 0 0 auto; transition: background .15s, border-color .15s; }
         .occ-item input:checked + .occ-box { background: #16181D; border-color: #16181D; }
         .occ-item input:focus-visible + .occ-box { outline: 2px solid #16181D; outline-offset: 2px; }
+        .occ-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
         .occ-label { flex: 1; font-size: 14px; color: #374151; }
         .occ-count { font-family: var(--font-mono), monospace; font-size: 12px; color: #9CA3AF; }
         .occ-clear { margin-top: 10px; background: none; border: none; color: #16181D; font-weight: 600; font-size: 13px; text-decoration: underline; padding: 4px 8px; }
@@ -677,11 +811,13 @@ export default function JobsPage() {
         /* ── job card + entrance animation ── */
         .results { display: flex; flex-direction: column; gap: 16px; }
         .job-card { transition: box-shadow .25s, border-color .25s; }
+        .job-card.clickable { cursor: pointer; }
         .job-card:hover { box-shadow: 0 18px 40px rgba(0,0,0,.10); border-color: rgba(37,99,235,.4); }
         .job-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
         .job-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 20px; letter-spacing: -.01em; }
         .job-company { color: #6B7280; font-size: 15px; margin-top: 2px; }
-        .logo { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-grotesk), sans-serif; font-weight: 700; font-size: 20px; flex: 0 0 auto; color: #16181D; background: rgba(0,0,0,.06); transition: transform .2s; }
+        .logo { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-grotesk), sans-serif; font-weight: 700; font-size: 20px; flex: 0 0 auto; color: #16181D; background: rgba(0,0,0,.06); transition: transform .2s; cursor: pointer; }
+        .logo:focus-visible { outline: 2px solid #16181D; outline-offset: 3px; }
         .job-card:hover .logo { transform: rotate(-4deg) scale(1.05); }
         .tag-row { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
         .tag-new { font-size: 12px; font-weight: 600; color: #16181D; background: rgba(0,0,0,.08); padding: 2px 10px; border-radius: 9999px; }
@@ -690,8 +826,8 @@ export default function JobsPage() {
         .highlights li { font-size: 14px; color: #374151; padding-left: 18px; position: relative; }
         .highlights li::before { content: "·"; position: absolute; left: 6px; color: #9CA3AF; }
         .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
-        .pill { font-family: var(--font-mono), monospace; font-size: 12px; padding: 4px 10px; border-radius: 9999px; background: rgba(0,0,0,.06); color: #16181D; transition: transform .15s, background .15s; }
-        .pill:hover { transform: scale(1.07); background: rgba(0,0,0,.1); }
+        .pill { font-family: var(--font-mono), monospace; font-size: 12px; padding: 4px 10px; border-radius: 9999px; background: var(--accent-soft); color: var(--accent); transition: transform .15s, background .15s; }
+        .pill:hover { transform: scale(1.07); background: rgba(var(--accent-rgb), .18); }
 
         .job-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,.08); flex-wrap: wrap; }
         .posted { font-size: 12px; }
@@ -699,8 +835,9 @@ export default function JobsPage() {
         .act { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #6B7280; background: none; border: 1px solid rgba(0,0,0,.14); padding: 6px 12px; border-radius: 9999px; transition: transform .15s, color .2s, border-color .2s, background .2s; }
         .act:hover { transform: translateY(-1px); color: #16181D; border-color: #16181D; }
         .act[data-on="true"] { color: #16181D; border-color: #16181D; background: rgba(0,0,0,.06); }
-        .act-cta { color: #16181D; border-color: #16181D; }
+        .act-cta { position: relative; overflow: hidden; color: #16181D; border-color: #16181D; }
         .act-cta:hover { background: #16181D; color: #fff; }
+        .act-cta:active { transform: scale(0.95); transition: transform .05s ease-in; }
 
         /* ── sidebar ── */
         .sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 88px; }
