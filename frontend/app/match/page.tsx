@@ -8,76 +8,49 @@ import api from "@/lib/api";
 import AppHeader from "../_components/AppHeader";
 import ConfettiBurst from "../_components/ConfettiBurst";
 import ScoreArc from "../_components/ScoreArc";
-import AccentMeter from "../_components/AccentMeter";
+import StatMeter from "../_components/StatMeter";
 import { scoreBand } from "../_components/scoreBand";
 import { useToast } from "../_components/ToastProvider";
 import { useRequireAuth } from "../_components/useRequireAuth";
 
 const shake = { initial: { x: 0 }, animate: { x: [0, -6, 6, -5, 5, 0] }, transition: { duration: 0.4 } };
 
-const ACCENT = "#0E9F6E";
+const ACCENT = "#7f77dd";
 
 /* ════════════════════════════════════════════════════════════════
-   CONTRACT SHAPES — exactly what the API returns (see API Contract v3)
+   CONTRACT SHAPES — exactly what the FastAPI backend returns.
    ════════════════════════════════════════════════════════════════ */
 
-// POST /api/match
+// POST /api/match  ->  { score, matched_skills, missing_skills, shap_scores }
+// (the backend does not return an `explanation` — kept optional for the mock).
 type MatchResponse = {
   score: number;
   matched_skills: string[];
   missing_skills: string[];
-  explanation: string;
+  explanation?: string;
   shap_scores: Record<string, number>; // { "Python": 0.32, "Docker": -0.15 }
 };
-
-// GET /api/best-fit  ->  { roles: BestFitRole[] }
-type BestFitRole = { title: string; fit: number; note: string };
 
 // GET /api/market-demand  ->  { role, location, skills: DemandSkill[] }
 type DemandSkill = { name: string; demand: number };
 
-// GET /api/jd-highlight  ->  { working_type, responsibilities, segments }
-// Each segment is a run of the job-description text, tagged matched / missing / plain.
-type JdSegment = { text: string; highlight: "matched" | "missing" | null };
-type JdHighlight = { working_type: string; responsibilities: string[]; segments: JdSegment[] };
-
-/* ── Mock data: shown when the backend is offline so the UI is previewable ── */
+/* ── Mock data: shown when the backend is offline so the UI is previewable.
+   Only what the live /api/match flow can actually produce — score, skills,
+   and shap_scores. (Best-fit and JD-highlight need the parsed resume text,
+   which the backend doesn't hand back, so they're not part of this flow.) ── */
 const MOCK_MATCH: MatchResponse = {
-  score: 78,
-  matched_skills: ["Python", "SQL", "Pandas"],
-  missing_skills: ["Docker", "Power BI"],
-  explanation: "Strong backend match. Missing DevOps and BI tools.",
-  shap_scores: { Python: 0.30, SQL: 0.22, Docker: -0.18 },
+  score: 74,
+  matched_skills: ["SQL", "Excel", "Python"],
+  missing_skills: ["Power BI", "Tableau"],
+  explanation: "Strong analytics match. Missing a couple of BI tools.",
+  shap_scores: { SQL: 0.30, Excel: 0.22, "Power BI": -0.18 },
 };
-const MOCK_BESTFIT: BestFitRole[] = [
-  { title: "Data Analyst", fit: 82, note: "Your skills cluster here" },
-  { title: "Business Analyst", fit: 64, note: "Close second" },
-  { title: "Data Scientist", fit: 47, note: "Needs more ML skills" },
-];
 const MOCK_DEMAND: DemandSkill[] = [
-  { name: "SQL", demand: 92 },
-  { name: "Python", demand: 64 },
-  { name: "Power BI", demand: 58 },
+  { name: "Reporting", demand: 83 },
+  { name: "Excel", demand: 64 },
+  { name: "SQL", demand: 62 },
+  { name: "Power BI", demand: 60 },
 ];
-const MOCK_JD: JdHighlight = {
-  working_type: "hybrid",
-  responsibilities: [
-    "Build and maintain data pipelines",
-    "Present insights to stakeholders",
-    "Partner with product on experiments",
-  ],
-  segments: [
-    { text: "We're after strong ", highlight: null },
-    { text: "SQL", highlight: "matched" },
-    { text: " and ", highlight: null },
-    { text: "Python", highlight: "matched" },
-    { text: " skills to build ", highlight: null },
-    { text: "Power BI", highlight: "missing" },
-    { text: " dashboards and ship models with ", highlight: null },
-    { text: "Docker", highlight: "missing" },
-    { text: ".", highlight: null },
-  ],
-};
 
 // Read a query param at call time (set by the "Match my resume" link on /jobs).
 function queryParam(name: string): string {
@@ -89,9 +62,7 @@ export default function MatchPage() {
   const authed = useRequireAuth();
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<MatchResponse | null>(null);
-  const [bestFit, setBestFit] = useState<BestFitRole[]>([]);
   const [demand, setDemand] = useState<DemandSkill[]>([]);
-  const [jd, setJd] = useState<JdHighlight | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -112,57 +83,40 @@ export default function MatchPage() {
     setFile(f);
   }
 
-  // Best-effort secondary insights. These live on separate endpoints and must
-  // never block or break the core score, so each is wrapped on its own.
-  async function loadInsights({ role, jobId, resumeId }: { role: string; jobId: string; resumeId: string }) {
-    try {
-      const res = await api.get("/api/best-fit");
-      setBestFit(res.data.roles ?? []);
-    } catch { /* leave best-fit empty if unavailable */ }
-
+  // Market demand for the matched role — the one secondary endpoint the match
+  // flow can actually call (it only needs ?role=, no resume text). Best-effort:
+  // it must never block or break the core score, so it's wrapped on its own.
+  async function loadDemand(role: string) {
     try {
       const q = role ? `?role=${encodeURIComponent(role)}` : "";
       const res = await api.get(`/api/market-demand${q}`);
       setDemand(res.data.skills ?? []);
     } catch { /* leave market demand empty if unavailable */ }
-
-    // jd-highlight needs job_id + resume_id. The contract's /api/match response
-    // does not (yet) return a resume_id, so we pass it only if the backend
-    // happens to include one; otherwise this call is skipped/hidden gracefully.
-    // TODO(Tommy): confirm where resume_id comes from for /api/jd-highlight.
-    try {
-      const p = new URLSearchParams();
-      if (jobId) p.set("job_id", jobId);
-      if (resumeId) p.set("resume_id", resumeId);
-      const res = await api.get(`/api/jd-highlight?${p.toString()}`);
-      setJd(res.data);
-    } catch { /* leave JD highlight hidden if unavailable */ }
   }
 
   async function handleMatch() {
     setError("");
     if (!file) { setError("Choose a PDF resume first."); return; }
 
-    const jobId = queryParam("job_id");
-    if (!jobId) {
+    const jobUrl = queryParam("job_url");
+    if (!jobUrl) {
       setError("Pick a job from the Jobs page first, then click “Match my resume” on it.");
       return;
     }
+    const token = localStorage.getItem("token") ?? "";
 
     setLoading(true);
-    setBestFit([]);
     setDemand([]);
-    setJd(null);
     try {
-      // Resume is a file + the job to score against -> multipart form-data
+      // Backend /api/match expects form fields: resume (file), job_url, token.
       const form = new FormData();
       form.append("resume", file);
-      form.append("job_id", jobId);
+      form.append("job_url", jobUrl);
+      form.append("token", token);
       const res = await api.post("/api/match", form);
       setResult(res.data);
       toast(`Scored ${res.data.score} / 100`);
-      // resume_id is read defensively (not guaranteed by the contract yet).
-      loadInsights({ role: queryParam("role"), jobId, resumeId: res.data.resume_id ?? "" });
+      loadDemand(queryParam("role"));
     } catch (err: any) {
       const status = err.response?.status;
       if (status === 413) { setError("That file is too large. Max 5MB."); toast("File too large (max 5MB)", "error"); }
@@ -172,9 +126,7 @@ export default function MatchPage() {
       else {
         setError("Backend offline. Showing a sample result so you can preview.");
         setResult(MOCK_MATCH);
-        setBestFit(MOCK_BESTFIT);
         setDemand(MOCK_DEMAND);
-        setJd(MOCK_JD);
       }
     } finally {
       setLoading(false);
@@ -236,7 +188,7 @@ export default function MatchPage() {
               <div className="score-row">
                 <div className="progress-ring">
                   <svg viewBox="0 0 100 100" className="progress-svg">
-                    <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(0,0,0,.07)" strokeWidth="8" />
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="8" />
                     <circle cx="50" cy="50" r="44" fill="none" stroke={ACCENT} strokeWidth="8" strokeLinecap="round" strokeDasharray="80 200" />
                   </svg>
                   <span className="progress-cap mono">Analyzing…</span>
@@ -332,33 +284,6 @@ export default function MatchPage() {
               </motion.div>
             </section>
 
-            {/* Job description, with your matched / missing skills highlighted in place */}
-            {jd && (
-              <section className="card block">
-                <h2 className="h-display block-title">In the job description</h2>
-                {jd.working_type && <p className="jd-arrangement mono">{jd.working_type} role</p>}
-                <p className="jd-text">
-                  {jd.segments.map((seg, i) => (
-                    <span key={i} className={seg.highlight ? `seg seg-${seg.highlight}` : undefined}>
-                      {seg.text}
-                    </span>
-                  ))}
-                </p>
-                <div className="jd-legend">
-                  <span className="legend-item"><span className="dot dot-matched" /> matched</span>
-                  <span className="legend-item"><span className="dot dot-missing" /> missing</span>
-                </div>
-                {jd.responsibilities.length > 0 && (
-                  <>
-                    <p className="skill-label jd-resp-label">Key responsibilities</p>
-                    <ul className="jd-resp">
-                      {jd.responsibilities.map((r) => <li key={r}>{r}</li>)}
-                    </ul>
-                  </>
-                )}
-              </section>
-            )}
-
             {/* Insights — skill impact (from this match) + market demand (separate endpoint) */}
             <section className="card block" id="insights">
               <h2 className="h-display block-title">What moved the needle</h2>
@@ -366,14 +291,15 @@ export default function MatchPage() {
                 <div>
                   <p className="skill-label">Skill impact</p>
                   {impact.map((d, i) => (
-                    <AccentMeter
+                    <StatMeter
                       key={d.label}
                       label={d.label}
-                      valueText={`${d.v >= 0 ? "+" : "-"}${Math.abs(d.v).toFixed(2)}`}
+                      value={Math.round(Math.abs(d.v) * 100)}
+                      format={(n) => `${d.v < 0 ? "−" : "+"}${(n / 100).toFixed(2)}`}
                       pct={(Math.abs(d.v) / maxImpact) * 100}
                       negative={d.v < 0}
                       baseline
-                      delay={i * 0.08}
+                      delay={i * 80}
                     />
                   ))}
                 </div>
@@ -381,42 +307,12 @@ export default function MatchPage() {
                   <div>
                     <p className="skill-label">Market demand</p>
                     {demand.map((d, i) => (
-                      <AccentMeter key={d.name} label={d.name} valueText={`${d.demand}`} pct={d.demand} delay={i * 0.08} />
+                      <StatMeter key={d.name} label={d.name} value={d.demand} format={(n) => `${n}%`} pct={d.demand} delay={i * 80} />
                     ))}
                   </div>
                 )}
               </div>
             </section>
-
-            {/* Best fit — separate endpoint; only shown when available */}
-            {bestFit.length > 0 && (
-              <section className="card block">
-                <h2 className="h-display block-title">Where your skills cluster</h2>
-                <div className="fit-grid">
-                  {bestFit.map((r, i) => {
-                    const fb = scoreBand(r.fit);
-                    return (
-                      <motion.div
-                        key={r.title}
-                        className={`fit-card ${i === 0 ? "featured" : ""}`}
-                        initial={{ opacity: 0, y: 16 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, amount: 0.4 }}
-                        transition={{ duration: 0.45, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                        whileHover={{ y: -4 }}
-                      >
-                        <p className="card-meta mono">{i === 0 ? "★ Best fit" : `Rank ${i + 1}`}</p>
-                        <h3 className="fit-role">{r.title}</h3>
-                        <p className="fit-score mono" style={{ color: fb.color }}>
-                          {r.fit}<span className="fit-pct">%</span>
-                        </p>
-                        {r.note && <p className="muted fit-note">{r.note}</p>}
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
           </div>
         )}
       </main>
@@ -425,16 +321,16 @@ export default function MatchPage() {
         .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 80px; }
         .page-title { font-size: clamp(30px, 5vw, 44px); margin: 6px 0 28px; }
         .upload { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-        .drop { flex: 1; min-width: 240px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px; border: 2px dashed rgba(0,0,0,.15); border-radius: 14px; cursor: pointer; transition: border-color .2s, background .2s; }
-        .drop:hover { border-color: #16181D; }
-        .drop.drag { border-color: #0E9F6E; background: rgba(14,159,110,.06); animation: dropPulse 1s ease-in-out infinite; }
+        .drop { flex: 1; min-width: 240px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px; border: 2px dashed var(--hairline); border-radius: 14px; cursor: pointer; transition: border-color .2s, background .2s; }
+        .drop:hover { border-color: var(--accent); }
+        .drop.drag { border-color: var(--accent); background: rgba(127,119,221,.10); animation: dropPulse 1s ease-in-out infinite; }
         @keyframes dropPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
         .sk-skills { display: flex; flex-direction: column; gap: 12px; }
         .progress-ring { position: relative; width: 168px; height: 168px; flex: 0 0 auto; display: grid; place-items: center; }
         .progress-svg { width: 100%; height: 100%; animation: spin 1.1s linear infinite; }
-        .progress-cap { position: absolute; font-size: 13px; color: #6B7280; }
+        .progress-cap { position: absolute; font-size: 13px; color: var(--muted); }
         .drop-icon { font-size: 24px; font-weight: 700; }
-        .drop-text { font-weight: 600; font-size: 15px; }
+        .drop-text { font-weight: 600; font-size: 15px; color: var(--ink); }
         .drop-hint { font-size: 12px; }
         .note { font-size: 14px; margin-top: 14px; }
         .results { display: flex; flex-direction: column; gap: 20px; margin-top: 28px; }
@@ -450,34 +346,8 @@ export default function MatchPage() {
         .rh-skills { display: flex; flex-direction: column; gap: 14px; }
         @media (max-width: 860px) { .result-hero { grid-template-columns: 1fr; } }
         .bars-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-        .fit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .fit-card { position: relative; border: 1px solid var(--hairline); border-radius: var(--r-lg); padding: 22px; background: var(--surface); box-shadow: var(--shadow-sm); transition: box-shadow .25s, border-color .25s; }
-        .fit-card:hover { box-shadow: var(--shadow-md); }
-        .fit-card.featured { background: var(--accent-soft); border-color: var(--accent-line); box-shadow: var(--shadow-accent); }
-        .card-meta { font-family: var(--font-mono), monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-        .fit-card.featured .card-meta { color: var(--accent); }
-        .fit-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 18px; margin-top: 8px; }
-        .fit-score { font-family: var(--font-mono), monospace; font-weight: 700; font-size: 38px; margin-top: 10px; line-height: 1; font-variant-numeric: tabular-nums; }
-        .fit-card.featured .fit-score { font-size: 48px; }
-        .fit-pct { font-size: 0.5em; color: var(--muted); margin-left: 2px; }
-        .fit-note { font-size: 13px; margin-top: 8px; line-height: 1.45; }
-        /* ── JD highlight ── */
-        .jd-arrangement { font-size: 12px; color: #9CA3AF; text-transform: capitalize; margin: -14px 0 18px; }
-        .jd-text { font-size: 17px; line-height: 1.95; color: #16181D; }
-        .seg { padding: 1px 5px; border-radius: 5px; font-weight: 600; }
-        .seg-matched { background: rgba(14,159,110,.14); color: #0B7A53; }
-        .seg-missing { background: rgba(225,29,72,.12); color: #B4143E; }
-        .jd-legend { display: flex; gap: 18px; margin-top: 18px; }
-        .legend-item { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono), monospace; font-size: 12px; color: #6B7280; }
-        .dot { width: 12px; height: 12px; border-radius: 4px; }
-        .dot-matched { background: rgba(14,159,110,.35); }
-        .dot-missing { background: rgba(225,29,72,.3); }
-        .jd-resp-label { margin-top: 26px; }
-        .jd-resp { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-        .jd-resp li { font-size: 15px; color: #374151; padding-left: 18px; position: relative; }
-        .jd-resp li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: #9CA3AF; }
         @media (max-width: 680px) {
-          .bars-2col, .fit-grid { grid-template-columns: 1fr; }
+          .bars-2col { grid-template-columns: 1fr; }
           .score-row { gap: 28px; }
         }
       `}</style>

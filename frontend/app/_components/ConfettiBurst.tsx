@@ -17,7 +17,7 @@ export default function ConfettiBurst({ count = 28 }: { count?: number }) {
           id: i,
           x: Math.cos(a) * d,
           y: Math.sin(a) * d,
-          c: ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#60a5fa"][i % 5],
+          c: ["#7f77dd", "#afa9ec", "#34d399", "#fbbf24", "#6c63c9"][i % 5],
           delay: Math.random() * 0.1,
         };
       }),

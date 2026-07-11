@@ -2,146 +2,121 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MagnifyingGlass, MapPin, CaretDown, Star, X, Check, Funnel, Stack, Brain, ChartBar, ChartPieSlice, Code, Cloud, PenNib, Megaphone, Wallet } from "@phosphor-icons/react";
+import { MagnifyingGlass, MapPin, CaretDown, Star, X, Check, Funnel, Stack, Brain, ChartBar, ChartPieSlice, Code, Cloud, PenNib, Megaphone, Wallet, ArrowRight } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import AppHeader from "../_components/AppHeader";
 import TiltCard from "../_components/TiltCard";
+import JobLetter from "../_components/JobLetter";
 import { useToast } from "../_components/ToastProvider";
 import { useRequireAuth } from "../_components/useRequireAuth";
 
 /* ════════════════════════════════════════════════════════════════
    1. CONFIG + MOCK DATA
    ════════════════════════════════════════════════════════════════ */
-const ACCENT = "#16181D"; // black & white theme, no blue
+const ACCENT = "#7f77dd"; // one purple accent, matches the landing
 const SLOGAN = "Find the job you actually fit…";
 
 const ROLE_SUGGESTIONS = ["Data Scientist", "Data Analyst", "ML Engineer", "BI Analyst", "Python", "SQL", "Power BI"];
 const LOC_SUGGESTIONS = ["Sydney NSW", "Melbourne VIC", "Brisbane QLD", "Remote"];
 
-// What the cards render. Fields the API contract guarantees are required; the
-// rest are optional "enrichments" (present in mock data, absent from the real
-// GET /api/jobs response) so the UI degrades gracefully against live data.
+// What the cards render — only fields the backend actually provides.
 type Job = {
   id: string;
   role: string;
   company: string;
   location: string;
-  type: string;            // working arrangement: Remote / Hybrid / On-site
+  type: string;            // employment type from badges: "Full time" / "Contract"...
+  arrangement: string;     // work style from badges: "Hybrid" / "Remote" / ""
+  salary: string;          // pay from badges, e.g. "$105,212 - $113,823 a year" / ""
   source: string;          // Seek / Jora
-  posted: string;          // e.g. "2 days ago"
-  skills: string[];
+  posted: string;          // e.g. "Posted 4d ago"
+  description: string;     // full JD text from the backend
   url?: string;
-  employmentType?: string; // not in the API contract
-  classification?: string; // not in the API contract
-  salary?: string;         // not in the API contract
-  salaryMin?: number;
-  postedDays?: number;
-  highlights?: string[];
 };
 
-// Exact shape returned by GET /api/jobs (per the API contract).
+// Exact shape returned by GET /api/jobs — raw records from jobs.json.
+// The backend does NOT provide job_id, skills, or working_type.
 type ApiJob = {
-  job_id: string;
   title: string;
   company: string;
   location: string;
-  source: string;
-  skills: string[];
-  url: string;
-  working_type: string;    // remote | hybrid | on-site
+  badges?: string[];       // e.g. ["Full time"] / ["Part time"] — employment type
   posted_at: string;
+  url: string;
+  description?: string;
+  source: string;          // "seek" | "jora"
 };
 
-// "hybrid" -> "Hybrid", "on-site" -> "On-site", "seek" -> "Seek"
+// "jora" -> "Jora", "seek" -> "Seek"
 function titleCase(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-// Map a contract job onto the shape the cards render.
+/* `badges` mixes three unrelated tags — pay, work arrangement, and employment
+   type — in no fixed order (e.g. ["$105k - $113k a year", "Full time", "Hybrid"]).
+   Split them so each shows correctly and the Type filter isn't fed a salary. */
+const SALARY_RE = /\$|\d,\d{3}/;
+const ARRANGEMENT_RE = /\b(hybrid|remote|on[-\s]?site|work from home|wfh)\b/i;
+const EMP_RE = /\b(full[-\s]?time|part[-\s]?time|casual|contract|permanent|fixed[-\s]?term|temporary|internship|graduate)\b/i;
+
+function parseBadges(badges: string[] = []): { type: string; arrangement: string; salary: string } {
+  let type = "", arrangement = "", salary = "";
+  for (const b of badges) {
+    if (!salary && SALARY_RE.test(b)) salary = b;
+    else if (!arrangement && ARRANGEMENT_RE.test(b)) arrangement = b;
+    else if (!type && EMP_RE.test(b)) type = b;
+  }
+  return { type, arrangement, salary };
+}
+
+// "$105,212 - $113,823 a year" -> "$105k–114k" for the compact card chip.
+function formatSalary(s: string): string {
+  const nums = s.match(/\d[\d,]*/g);
+  if (!nums) return s;
+  const toK = (n: string) => {
+    const v = parseInt(n.replace(/,/g, ""), 10);
+    return v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`;
+  };
+  return nums.length >= 2 ? `$${toK(nums[0])}–${toK(nums[1])}` : `$${toK(nums[0])}`;
+}
+
+// Map a backend job onto the shape the cards render.
 function fromApi(j: ApiJob): Job {
+  const { type, arrangement, salary } = parseBadges(j.badges);
   return {
-    id: j.job_id,
+    id: j.url,                     // no job_id from backend; the URL is the stable key
     role: j.title,
     company: j.company,
     location: j.location,
-    type: titleCase(j.working_type),
+    type,
+    arrangement,
+    salary,
     source: titleCase(j.source),
     posted: j.posted_at,
+    description: j.description ?? "",
     url: j.url,
-    skills: j.skills ?? [],
   };
 }
 
+// Offline fallback only — same shape as the real backend records.
 const MOCK_JOBS: Job[] = [
   {
-    id: "1", role: "Data Scientist", company: "Canva", location: "Sydney NSW", type: "Hybrid",
-    employmentType: "Full-time", classification: "Data & Analytics", source: "Seek",
-    salary: "$120k - $145k", salaryMin: 120, postedDays: 0, posted: "New",
-    highlights: ["Work on recommendation models", "Flexible hybrid setup", "Equity + learning budget"],
-    skills: ["Python", "SQL", "ML"],
+    id: "mock-1", role: "Data Scientist", company: "Canva", location: "Sydney NSW",
+    type: "Full time", arrangement: "Hybrid", salary: "$120,000 - $145,000 a year",
+    source: "Seek", posted: "Posted 1d ago",
+    description: "Work on recommendation models with Python and SQL in a flexible hybrid setup.",
   },
   {
-    id: "2", role: "Data Analyst", company: "Atlassian", location: "Remote", type: "Remote",
-    employmentType: "Full-time", classification: "Data & Analytics", source: "Jora",
-    salary: "$95k - $110k", salaryMin: 95, postedDays: 2, posted: "2d ago",
-    highlights: ["Fully remote across AU", "Own the analytics stack", "Great onboarding"],
-    skills: ["SQL", "Tableau", "Excel"],
+    id: "mock-2", role: "Data Analyst", company: "Atlassian", location: "Remote",
+    type: "Full time", arrangement: "Remote", salary: "",
+    source: "Jora", posted: "Posted 2d ago",
+    description: "Own the analytics stack end to end: SQL, Tableau, and stakeholder reporting.",
   },
   {
-    id: "3", role: "ML Engineer", company: "Airwallex", location: "Melbourne VIC", type: "On-site",
-    employmentType: "Full-time", classification: "Engineering", source: "Seek",
-    salary: "$140k - $170k", salaryMin: 140, postedDays: 3, posted: "3d ago",
-    highlights: ["Ship models to production", "Fast-growing fintech", "Strong eng culture"],
-    skills: ["Python", "Docker", "AWS"],
-  },
-  {
-    id: "4", role: "BI Analyst", company: "Telstra", location: "Sydney NSW", type: "Hybrid",
-    employmentType: "Contract", classification: "Data & Analytics", source: "Jora",
-    salary: "$100k - $120k", salaryMin: 100, postedDays: 5, posted: "5d ago",
-    highlights: ["Build exec dashboards", "Cross-team projects", "Hybrid 3 days office"],
-    skills: ["Power BI", "SQL", "DAX"],
-  },
-  {
-    id: "5", role: "DevOps Engineer", company: "Canva", location: "Sydney NSW", type: "Hybrid",
-    employmentType: "Full-time", classification: "Engineering", source: "Seek",
-    salary: "$130k - $160k", salaryMin: 130, postedDays: 1, posted: "1d ago",
-    highlights: ["Own the CI/CD pipeline", "Kubernetes at scale", "On-call rotation"],
-    skills: ["AWS", "Kubernetes", "Terraform"],
-  },
-  {
-    id: "6", role: "Cloud Engineer", company: "REA Group", location: "Brisbane QLD", type: "Remote",
-    employmentType: "Full-time", classification: "Engineering", source: "Seek",
-    salary: "$135k - $165k", salaryMin: 135, postedDays: 3, posted: "3d ago",
-    highlights: ["Multi-cloud platform", "Infrastructure as code", "Strong eng culture"],
-    skills: ["GCP", "Terraform", "Go"],
-  },
-  {
-    id: "7", role: "Software Engineer", company: "Atlassian", location: "Remote", type: "Remote",
-    employmentType: "Full-time", classification: "Engineering", source: "Jora",
-    salary: "$125k - $150k", salaryMin: 125, postedDays: 1, posted: "1d ago",
-    highlights: ["Full-stack product work", "TypeScript + React", "Ship weekly"],
-    skills: ["TypeScript", "React", "Node"],
-  },
-  {
-    id: "8", role: "Product Designer", company: "Airwallex", location: "Melbourne VIC", type: "Hybrid",
-    employmentType: "Full-time", classification: "Design", source: "Seek",
-    salary: "$110k - $135k", salaryMin: 110, postedDays: 4, posted: "4d ago",
-    highlights: ["End-to-end product design", "Own the design system", "Tight eng partnership"],
-    skills: ["Figma", "Prototyping", "UX"],
-  },
-  {
-    id: "9", role: "Growth Marketer", company: "Linktree", location: "Melbourne VIC", type: "Hybrid",
-    employmentType: "Full-time", classification: "Marketing", source: "Jora",
-    salary: "$95k - $120k", salaryMin: 95, postedDays: 2, posted: "2d ago",
-    highlights: ["Own paid acquisition", "Experiment-driven", "B2C consumer app"],
-    skills: ["SEO", "Analytics", "Paid Ads"],
-  },
-  {
-    id: "10", role: "Financial Analyst", company: "Telstra", location: "Sydney NSW", type: "On-site",
-    employmentType: "Full-time", classification: "Finance", source: "Jora",
-    salary: "$100k - $125k", salaryMin: 100, postedDays: 6, posted: "6d ago",
-    highlights: ["FP&A for a large org", "Model the roadmap", "Exec reporting"],
-    skills: ["Excel", "SQL", "Modelling"],
+    id: "mock-3", role: "ML Engineer", company: "Airwallex", location: "Melbourne VIC",
+    type: "Full time", arrangement: "", salary: "",
+    source: "Seek", posted: "Posted 3d ago",
+    description: "Ship ML models to production with Python, Docker, and AWS at a fast-growing fintech.",
   },
 ];
 
@@ -207,7 +182,7 @@ function Dropdown({
               key={o}
               className="dd-opt"
               onClick={() => { onChange(o); setOpen(false); }}
-              style={o === value ? { background: "rgba(0,0,0,.06)", fontWeight: 600 } : undefined}
+              style={o === value ? { background: "rgba(127,119,221,.16)", fontWeight: 600 } : undefined}
             >
               {o}
             </button>
@@ -231,12 +206,10 @@ export default function JobsPage() {
   const [location, setLocation] = useState("");
   const [focus, setFocus] = useState<"" | "kw" | "loc">("");
 
-  // dropdown filters (index 0 of each = "any")
-  const [pay, setPay] = useState("Any pay");
+  // dropdown filters (index 0 of each = "any") — only dimensions the backend
+  // data actually carries: employment type (badges) and source (seek/jora).
   const [empType, setEmpType] = useState("Any type");
-  const [remote, setRemote] = useState("Anywhere");
-  const [classification, setClassification] = useState("All fields");
-  const [listing, setListing] = useState("Any time");
+  const [source, setSource] = useState("All sources");
 
   // occupation-field filter (top category cards + left checkbox column)
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
@@ -244,6 +217,7 @@ export default function JobsPage() {
   // per-job actions
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [openJob, setOpenJob] = useState<Job | null>(null); // job shown in the letter modal
 
   // typewriter slogan
   const [typed, setTyped] = useState("");
@@ -266,14 +240,13 @@ export default function JobsPage() {
     }
   }, []);
 
-  // Build the querystring from the filters the API contract supports.
+  // Build the querystring from the params the backend actually supports: q,
+  // location, source. (There is no working_type / limit on the backend.)
   function buildQuery(): string {
     const p = new URLSearchParams();
     if (keyword) p.set("q", keyword);
     if (location) p.set("location", location);
-    if (remote !== "Anywhere") p.set("working_type", remote.toLowerCase()); // remote | hybrid | on-site
-    p.set("limit", "20");
-    return `?${p.toString()}`;
+    return p.toString() ? `?${p.toString()}` : "";
   }
 
   // Re-query the backend with the current search terms.
@@ -303,25 +276,16 @@ export default function JobsPage() {
     return () => clearInterval(id);
   }, [keyword, reduced]);
 
-  // Helpers to turn filter labels into numbers
-  const payMin = { "Any pay": 0, "$80k+": 80, "$100k+": 100, "$130k+": 130 }[pay] ?? 0;
-  const listingMax = { "Any time": 999, "Today": 0, "Last 3 days": 3, "Last 7 days": 7 }[listing] ?? 999;
-
-  // Apply every filter. Filters on optional fields (pay, employment type,
-  // classification, listing time) pass through when the field is absent, so
-  // real API jobs (which don't carry those fields) are never wrongly excluded.
-  // Everything except the occupation-field filter, so the field counts below
-  // reflect the current search but not the field selection itself.
+  // Apply every filter — all on fields the backend really returns. Everything
+  // except the occupation-field filter, so the field counts below reflect the
+  // current search but not the field selection itself.
   const baseFiltered = jobs.filter((j) => {
     if (hidden.has(j.id)) return false;
-    const inKw = `${j.role} ${j.company} ${j.skills.join(" ")}`.toLowerCase().includes(keyword.toLowerCase());
+    const inKw = `${j.role} ${j.company} ${j.description}`.toLowerCase().includes(keyword.toLowerCase());
     const inLoc = j.location.toLowerCase().includes(location.toLowerCase());
-    const inPay = payMin === 0 || j.salaryMin == null || j.salaryMin >= payMin;
-    const inEmp = empType === "Any type" || j.employmentType == null || j.employmentType === empType;
-    const inRemote = remote === "Anywhere" || j.type === remote;
-    const inClass = classification === "All fields" || j.classification == null || j.classification === classification;
-    const inListing = listingMax === 999 || j.postedDays == null || j.postedDays <= listingMax;
-    return inKw && inLoc && inPay && inEmp && inRemote && inClass && inListing;
+    const inEmp = empType === "Any type" || j.type === empType;
+    const inSource = source === "All sources" || j.source === source;
+    return inKw && inLoc && inEmp && inSource;
   });
 
   // Live count per occupation field (shown next to each checkbox).
@@ -446,13 +410,10 @@ export default function JobsPage() {
           })}
         </div>
 
-        {/* ── dropdown filters ── */}
+        {/* ── dropdown filters — employment type (badges) + source, both real ── */}
         <div className="filters">
-          <Dropdown label="Pay" value={pay} onChange={setPay} options={["Any pay", "$80k+", "$100k+", "$130k+"]} />
-          <Dropdown label="Type" value={empType} onChange={setEmpType} options={["Any type", "Full-time", "Part-time", "Casual", "Contract"]} />
-          <Dropdown label="Remote" value={remote} onChange={setRemote} options={["Anywhere", "Remote", "Hybrid", "On-site"]} />
-          <Dropdown label="Classification" value={classification} onChange={setClassification} options={["All fields", "Data & Analytics", "Engineering"]} />
-          <Dropdown label="Listing time" value={listing} onChange={setListing} options={["Any time", "Today", "Last 3 days", "Last 7 days"]} />
+          <Dropdown label="Type" value={empType} onChange={setEmpType} options={["Any type", "Full time", "Part time", "Contract", "Permanent", "Casual"]} />
+          <Dropdown label="Source" value={source} onChange={setSource} options={["All sources", "Seek", "Jora"]} />
         </div>
 
         {/* hidden notice */}
@@ -518,29 +479,32 @@ export default function JobsPage() {
                 const isSaved = saved.has(job.id);
                 return (
                   <TiltCard key={job.id} className="card job-card" index={i}>
-                    <div className="job-head">
-                      <div>
-                        <h3 className="job-role">{job.role}</h3>
-                        <p className="job-company">{job.company}</p>
+                    <div
+                      className="job-open"
+                      role="button"
+                      tabIndex={0}
+                      aria-haspopup="dialog"
+                      onClick={() => setOpenJob(job)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenJob(job); } }}
+                    >
+                      <div className="job-head">
+                        <div>
+                          <h3 className="job-role">{job.role}</h3>
+                          <p className="job-company">{job.company}</p>
+                        </div>
+                        <span className="logo">{job.company[0]}</span>
                       </div>
-                      <span className="logo">{job.company[0]}</span>
-                    </div>
 
-                    <div className="tag-row">
-                      {job.posted === "New" && <span className="tag-new">New</span>}
-                      <span className="muted mono job-meta">
-                        {job.type} · {job.location}{job.salary ? ` · ${job.salary}` : ""}
+                      <div className="tag-row">
+                        <span className="muted mono job-meta">
+                          {[job.type, job.arrangement, job.location].filter(Boolean).join(" · ")}
+                        </span>
+                        {job.salary && <span className="salary-chip mono">{formatSalary(job.salary)}</span>}
+                      </div>
+
+                      <span className="open-hint">
+                        Open full details <ArrowRight size={14} weight="bold" className="oh-arrow" />
                       </span>
-                    </div>
-
-                    {job.highlights && job.highlights.length > 0 && (
-                      <ul className="highlights">
-                        {job.highlights.map((h) => <li key={h}>{h}</li>)}
-                      </ul>
-                    )}
-
-                    <div className="pill-row">
-                      {job.skills.map((s) => <span key={s} className="pill">{s}</span>)}
                     </div>
 
                     <div className="job-foot">
@@ -567,7 +531,7 @@ export default function JobsPage() {
                           <X size={14} /> Hide
                         </button>
                         <Link
-                          href={`/match?job_id=${encodeURIComponent(job.id)}&role=${encodeURIComponent(job.role)}`}
+                          href={`/match?job_url=${encodeURIComponent(job.url ?? job.id)}&role=${encodeURIComponent(job.role)}`}
                           className="act act-cta"
                         >
                           Match my resume →
@@ -605,66 +569,69 @@ export default function JobsPage() {
         </div>
       </main>
 
+      <JobLetter job={openJob} onClose={() => setOpenJob(null)} />
+
       <style>{`
-        /* fonts: explicit Inter / Space Grotesk so nothing falls back to ui-sans-serif */
         .band, .wrap { font-family: var(--font-sans), sans-serif; }
 
         /* ── search band ── */
-        .band { background: #fff; border-bottom: 1px solid rgba(0,0,0,.08); }
+        .band { background: rgba(20,19,28,.6); border-bottom: 1px solid var(--hairline); backdrop-filter: blur(8px); }
         .band-inner { max-width: 1100px; margin: 0 auto; padding: 20px 24px; display: flex; gap: 12px; flex-wrap: wrap; }
-        .field { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid rgba(0,0,0,.16); border-radius: 10px; background: #fff; transition: border-color .2s, box-shadow .2s; }
-        .field:focus-within { border-color: #16181D; box-shadow: 0 0 0 3px rgba(0,0,0,.06); }
-        .ic { color: #9CA3AF; font-size: 18px; }
-        .ic-sm { color: #9CA3AF; font-size: 14px; margin-right: 8px; }
-        .inp { flex: 1; border: none; outline: none; font-family: var(--font-sans), sans-serif; font-size: 15px; padding: 12px 0; background: transparent; }
-        .search-btn { background: #16181D; color: #fff; font-family: var(--font-sans), sans-serif; font-weight: 600; font-size: 15px; border: none; border-radius: 10px; padding: 0 28px; transition: transform .15s, box-shadow .2s; }
-        .search-btn:hover { transform: translateY(-1px) scale(1.02); box-shadow: 0 6px 16px rgba(0,0,0,.2); }
+        .field { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface); transition: border-color .2s, box-shadow .2s; }
+        .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(127,119,221,.18); }
+        .ic { color: var(--muted); font-size: 18px; }
+        .ic-sm { color: var(--muted); font-size: 14px; margin-right: 8px; }
+        .inp { flex: 1; border: none; outline: none; font-family: var(--font-sans), sans-serif; font-size: 15px; padding: 12px 0; background: transparent; color: var(--ink); }
+        .inp::placeholder { color: var(--muted); }
+        .search-btn { background: var(--accent); color: #fff; font-family: var(--font-sans), sans-serif; font-weight: 600; font-size: 15px; border: none; border-radius: 10px; padding: 0 28px; transition: transform .15s, box-shadow .2s, background .2s; }
+        .search-btn:hover { transform: translateY(-1px) scale(1.02); background: #938ce4; box-shadow: 0 6px 18px rgba(127,119,221,.4); }
 
         /* suggestions */
-        .sugg { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.1); padding: 6px; z-index: 30; animation: pop .14s ease; }
-        .sugg-opt { display: flex; align-items: center; width: 100%; text-align: left; font-size: 14px; padding: 9px 10px; border: none; background: none; border-radius: 8px; transition: background .15s; }
-        .sugg-opt:hover { background: rgba(0,0,0,.05); }
+        .sugg { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: var(--shadow-md); padding: 6px; z-index: 30; animation: pop .14s ease; }
+        .sugg-opt { display: flex; align-items: center; width: 100%; text-align: left; font-size: 14px; padding: 9px 10px; border: none; background: none; border-radius: 8px; color: var(--ink); transition: background .15s; }
+        .sugg-opt:hover { background: rgba(127,119,221,.14); }
         @keyframes pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
         /* ── layout ── */
         .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 24px 80px; }
         .filters { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
         .dd { position: relative; }
-        .dd-btn { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #374151; background: #fff; border: 1px solid rgba(0,0,0,.16); padding: 9px 16px; border-radius: 9999px; transition: transform .15s, border-color .2s, background .2s; }
-        .dd-btn:hover { transform: translateY(-1px); border-color: #16181D; background: rgba(0,0,0,.02); }
+        .dd-btn { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); background: var(--surface); border: 1px solid var(--hairline); padding: 9px 16px; border-radius: 9999px; transition: transform .15s, border-color .2s, background .2s, color .2s; }
+        .dd-btn:hover { transform: translateY(-1px); border-color: var(--accent); color: var(--ink); background: rgba(127,119,221,.08); }
         .dd-caret { font-size: 11px; transition: transform .2s; }
-        .dd-menu { position: absolute; top: calc(100% + 8px); left: 0; min-width: 180px; background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.12); padding: 6px; z-index: 30; animation: pop .14s ease; }
-        .dd-opt { display: block; width: 100%; text-align: left; font-size: 14px; padding: 9px 12px; border: none; background: none; border-radius: 8px; transition: background .15s; }
-        .dd-opt:hover { background: rgba(0,0,0,.05); }
+        .dd-menu { position: absolute; top: calc(100% + 8px); left: 0; min-width: 180px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: var(--shadow-md); padding: 6px; z-index: 30; animation: pop .14s ease; }
+        .dd-opt { display: block; width: 100%; text-align: left; font-size: 14px; padding: 9px 12px; border: none; background: none; border-radius: 8px; color: var(--ink); transition: background .15s; }
+        .dd-opt:hover { background: rgba(127,119,221,.14); }
 
-        .hidden-note { font-size: 13px; color: #6B7280; margin-bottom: 16px; }
-        .link-btn { background: none; border: none; color: #16181D; font-weight: 600; font-size: 13px; text-decoration: underline; }
+        .hidden-note { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+        .link-btn { background: none; border: none; color: var(--accent-bright); font-weight: 600; font-size: 13px; text-decoration: underline; }
 
         .layout { display: grid; grid-template-columns: 200px 1fr 280px; gap: 22px; align-items: start; }
         .state { padding: 30px 0; }
 
         /* ── first row: category cards ── */
         .cat-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 22px; scrollbar-width: thin; }
-        .cat { flex: 0 0 auto; width: 108px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 10px; background: #fff; border: 1px solid rgba(0,0,0,.1); border-radius: 14px; cursor: pointer; transition: transform .15s, border-color .2s, background .2s; }
-        .cat:hover { transform: translateY(-2px); border-color: #16181D; }
-        .cat-on { border-color: #16181D; background: rgba(0,0,0,.04); }
-        .cat-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(0,0,0,.05); color: #16181D; transition: background .2s, color .2s; }
-        .cat-on .cat-ic { background: #16181D; color: #fff; }
-        .cat-label { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.3; color: #374151; }
+        .cat { flex: 0 0 auto; width: 108px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 10px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; cursor: pointer; transition: transform .15s, border-color .2s, background .2s; }
+        .cat:hover { transform: translateY(-2px); border-color: var(--accent); }
+        .cat-on { border-color: var(--accent); background: rgba(127,119,221,.12); }
+        .cat-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(127,119,221,.12); color: var(--accent-bright); transition: background .2s, color .2s; }
+        .cat-on .cat-ic { background: var(--accent); color: #fff; }
+        .cat-label { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.3; color: var(--muted); }
+        .cat-on .cat-label { color: var(--ink); }
 
         /* ── first column: occupation checkboxes ── */
         .occ-col { position: sticky; top: 88px; }
-        .occ-head { display: flex; align-items: center; gap: 8px; font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 15px; margin-bottom: 12px; }
+        .occ-head { display: flex; align-items: center; gap: 8px; font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 15px; margin-bottom: 12px; color: var(--ink); }
         .occ-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
         .occ-item { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 8px; cursor: pointer; transition: background .15s; }
-        .occ-item:hover { background: rgba(0,0,0,.04); }
+        .occ-item:hover { background: rgba(127,119,221,.08); }
         .occ-item input { position: absolute; opacity: 0; width: 0; height: 0; }
-        .occ-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid rgba(0,0,0,.25); display: grid; place-items: center; color: #fff; flex: 0 0 auto; transition: background .15s, border-color .15s; }
-        .occ-item input:checked + .occ-box { background: #16181D; border-color: #16181D; }
-        .occ-item input:focus-visible + .occ-box { outline: 2px solid #16181D; outline-offset: 2px; }
-        .occ-label { flex: 1; font-size: 14px; color: #374151; }
-        .occ-count { font-family: var(--font-mono), monospace; font-size: 12px; color: #9CA3AF; }
-        .occ-clear { margin-top: 10px; background: none; border: none; color: #16181D; font-weight: 600; font-size: 13px; text-decoration: underline; padding: 4px 8px; }
+        .occ-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid rgba(127,119,221,.4); display: grid; place-items: center; color: #fff; flex: 0 0 auto; transition: background .15s, border-color .15s; }
+        .occ-item input:checked + .occ-box { background: var(--accent); border-color: var(--accent); }
+        .occ-item input:focus-visible + .occ-box { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+        .occ-label { flex: 1; font-size: 14px; color: var(--muted); }
+        .occ-count { font-family: var(--font-mono), monospace; font-size: 12px; color: var(--muted); }
+        .occ-clear { margin-top: 10px; background: none; border: none; color: var(--accent-bright); font-weight: 600; font-size: 13px; text-decoration: underline; padding: 4px 8px; }
 
         /* ── skeleton job cards ── */
         .sk-card { padding: 22px; }
@@ -676,42 +643,52 @@ export default function JobsPage() {
 
         /* ── job card + entrance animation ── */
         .results { display: flex; flex-direction: column; gap: 16px; }
-        .job-card { transition: box-shadow .25s, border-color .25s; }
-        .job-card:hover { box-shadow: 0 18px 40px rgba(0,0,0,.10); border-color: rgba(37,99,235,.4); }
+        .job-card { transition: box-shadow .25s, border-color .25s, transform .25s; }
+        .job-card:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(127,119,221,.16); border-color: var(--accent-line); }
         .job-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-        .job-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 20px; letter-spacing: -.01em; }
-        .job-company { color: #6B7280; font-size: 15px; margin-top: 2px; }
-        .logo { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-grotesk), sans-serif; font-weight: 700; font-size: 20px; flex: 0 0 auto; color: #16181D; background: rgba(0,0,0,.06); transition: transform .2s; }
+        .job-role { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 20px; letter-spacing: -.01em; color: var(--ink); }
+        .job-company { color: var(--muted); font-size: 15px; margin-top: 2px; }
+        .logo { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-grotesk), sans-serif; font-weight: 700; font-size: 20px; flex: 0 0 auto; color: var(--accent-bright); background: rgba(127,119,221,.14); transition: transform .2s; }
         .job-card:hover .logo { transform: rotate(-4deg) scale(1.05); }
         .tag-row { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
-        .tag-new { font-size: 12px; font-weight: 600; color: #16181D; background: rgba(0,0,0,.08); padding: 2px 10px; border-radius: 9999px; }
         .job-meta { font-size: 13px; }
-        .highlights { list-style: none; display: flex; flex-direction: column; gap: 5px; margin: 4px 0 14px; }
-        .highlights li { font-size: 14px; color: #374151; padding-left: 18px; position: relative; }
-        .highlights li::before { content: "·"; position: absolute; left: 6px; color: #9CA3AF; }
-        .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
-        .pill { font-family: var(--font-mono), monospace; font-size: 12px; padding: 4px 10px; border-radius: 9999px; background: rgba(0,0,0,.06); color: #16181D; transition: transform .15s, background .15s; }
-        .pill:hover { transform: scale(1.07); background: rgba(0,0,0,.1); }
+        .salary-chip {
+          font-size: 12px; font-weight: 600; color: var(--accent-bright);
+          background: rgba(127,119,221,.14); border: 1px solid var(--accent-line);
+          padding: 3px 10px; border-radius: 9999px; white-space: nowrap;
+        }
 
-        .job-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,.08); flex-wrap: wrap; }
+        /* ── the whole upper card opens the job letter ── */
+        .job-open { display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; border-radius: 10px; }
+        .job-open:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 4px; }
+        .open-hint {
+          display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+          font-size: 13px; font-weight: 600; color: var(--accent-bright);
+          transition: gap .2s ease;
+        }
+        .oh-arrow { transition: transform .2s ease; }
+        .job-card:hover .open-hint { gap: 9px; }
+        .job-card:hover .oh-arrow { transform: translateX(3px); }
+
+        .job-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hairline); flex-wrap: wrap; }
         .posted { font-size: 12px; }
         .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .act { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #6B7280; background: none; border: 1px solid rgba(0,0,0,.14); padding: 6px 12px; border-radius: 9999px; transition: transform .15s, color .2s, border-color .2s, background .2s; }
-        .act:hover { transform: translateY(-1px); color: #16181D; border-color: #16181D; }
-        .act[data-on="true"] { color: #16181D; border-color: #16181D; background: rgba(0,0,0,.06); }
-        .act-cta { color: #16181D; border-color: #16181D; }
-        .act-cta:hover { background: #16181D; color: #fff; }
+        .act { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); background: none; border: 1px solid var(--hairline); padding: 6px 12px; border-radius: 9999px; transition: transform .15s, color .2s, border-color .2s, background .2s; }
+        .act:hover { transform: translateY(-1px); color: var(--ink); border-color: var(--accent); }
+        .act[data-on="true"] { color: var(--accent-bright); border-color: var(--accent); background: rgba(127,119,221,.14); }
+        .act-cta { color: var(--accent-bright); border-color: var(--accent); }
+        .act-cta:hover { background: var(--accent); color: #fff; }
 
         /* ── sidebar ── */
         .sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 88px; }
         .side-card { padding: 22px; transition: transform .18s, box-shadow .2s; }
-        .side-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.06); }
-        .cv-card { border-color: rgba(0,0,0,.2); background: rgba(0,0,0,.03); }
-        .side-title { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 17px; }
+        .side-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .cv-card { border-color: var(--accent-line); background: rgba(127,119,221,.08); }
+        .side-title { font-family: var(--font-grotesk), sans-serif; font-weight: 600; font-size: 17px; color: var(--ink); }
         .side-text { font-size: 14px; line-height: 1.55; margin-top: 8px; }
         .side-btn { display: inline-block; margin-top: 16px; text-align: center; }
         .saved-list { list-style: none; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-        .saved-item { font-size: 14px; font-weight: 500; }
+        .saved-item { font-size: 14px; font-weight: 500; color: var(--ink); }
 
         @media (max-width: 1080px) {
           .layout { grid-template-columns: 1fr 260px; }

@@ -32,15 +32,18 @@ export default function ScoreArc({
 }) {
   const reduce = useReducedMotion();
   const uid = useId().replace(/:/g, "");
+  // Round every derived coordinate to a fixed precision: raw trig floats round
+  // differently on the server vs the client and trip a hydration mismatch.
+  const rnd = (v: number) => Math.round(v * 1000) / 1000;
   const r = (size - thickness) / 2;
   const cx = size / 2;
   const cy = size / 2;
-  const C = 2 * Math.PI * r;
+  const C = rnd(2 * Math.PI * r);
   const pct = Math.max(0, Math.min(100, value)) / 100;
-  const dash = C * pct;
+  const dash = rnd(C * pct);
   const ang = (-90 + pct * 360) * (Math.PI / 180);
-  const tx = cx + r * Math.cos(ang);
-  const ty = cy + r * Math.sin(ang);
+  const tx = rnd(cx + r * Math.cos(ang));
+  const ty = rnd(cy + r * Math.sin(ang));
   const count = useCountUp(value, reduce);
 
   // gauge tick marks just inside the track
@@ -55,9 +58,9 @@ export default function ScoreArc({
       tickEls.push(
         <line
           key={i}
-          x1={cx + rOut * Math.cos(a)} y1={cy + rOut * Math.sin(a)}
-          x2={cx + rIn * Math.cos(a)} y2={cy + rIn * Math.sin(a)}
-          stroke={major ? "rgba(0,0,0,.22)" : "rgba(0,0,0,.1)"}
+          x1={rnd(cx + rOut * Math.cos(a))} y1={rnd(cy + rOut * Math.sin(a))}
+          x2={rnd(cx + rIn * Math.cos(a))} y2={rnd(cy + rIn * Math.sin(a))}
+          stroke={major ? "rgba(245,244,255,.28)" : "rgba(245,244,255,.12)"}
           strokeWidth={major ? 1.5 : 1}
         />
       );
@@ -83,7 +86,7 @@ export default function ScoreArc({
             <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(0,0,0,.06)" strokeWidth={thickness} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth={thickness} />
         <motion.circle
           cx={cx} cy={cy} r={r} fill="none" stroke={`url(#grad-${uid})`} strokeWidth={thickness} strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cy})`}
@@ -109,10 +112,16 @@ export default function ScoreArc({
       </div>
 
       <style>{`
-        .scorearc { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
+        .scorearc { position: relative; display: grid; place-items: center; flex: 0 0 auto; transition: transform .35s cubic-bezier(.22,1,.36,1); }
+        .scorearc:hover { transform: scale(1.035); }
         .scorearc svg { transform: translateZ(0); }
+        /* the tick ring (first <g>) brightens on hover for a live, instrument feel */
+        .scorearc svg > g:first-of-type { transition: filter .3s ease; }
+        .scorearc:hover svg > g:first-of-type { filter: brightness(1.8); }
         .scorearc-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-        .scorearc-num { font-family: var(--font-mono), monospace; font-weight: 700; font-size: ${Math.round(size * 0.26)}px; line-height: 1; color: var(--ink); }
+        .scorearc-num { font-family: var(--font-mono), monospace; font-weight: 700; font-size: ${Math.round(size * 0.26)}px; line-height: 1; color: var(--ink); transition: text-shadow .3s ease; }
+        .scorearc:hover .scorearc-num { text-shadow: 0 0 18px var(--accent); }
+        @media (prefers-reduced-motion: reduce) { .scorearc, .scorearc:hover { transform: none; } }
         .scorearc-suffix { font-size: 12px; color: var(--muted); margin-top: 4px; }
         .scorearc-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-top: 4px; }
       `}</style>

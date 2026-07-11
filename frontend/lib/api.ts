@@ -15,7 +15,9 @@ const baseURL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const api = axios.create({
   baseURL,
-  timeout: 15000, // 15s — generous enough for a resume upload + scoring
+  // The HF Spaces free tier can take 30s+ to respond from a cold start; a
+  // short timeout aborts mid-download and silently drops to mock data.
+  timeout: 60000,
 });
 
 // Attach the bearer token (saved by login/register) to every request.

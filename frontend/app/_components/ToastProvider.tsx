@@ -59,22 +59,22 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
           display: flex; align-items: center; gap: 10px;
           min-width: 240px; max-width: 360px;
           padding: 12px 12px 12px 14px;
-          background: #fff; color: #16181D;
-          border: 1px solid rgba(0,0,0,.08); border-radius: 12px;
-          box-shadow: 0 12px 30px rgba(0,0,0,.14);
+          background: var(--surface-2, #1b1a26); color: var(--ink, #f5f4ff);
+          border: 1px solid rgba(127,119,221,.22); border-radius: 12px;
+          box-shadow: 0 12px 30px rgba(0,0,0,.5);
           animation: toastIn .32s cubic-bezier(.22,1,.36,1) both;
         }
         .toast-ic { flex: 0 0 auto; }
-        .toast-ic.ok { color: #0E9F6E; }
-        .toast-ic.err { color: #E11D48; }
+        .toast-ic.ok { color: #34d399; }
+        .toast-ic.err { color: #fb7185; }
         .toast-msg { flex: 1; font-size: 14px; font-weight: 500; line-height: 1.35; }
         .toast-x {
           flex: 0 0 auto; display: grid; place-items: center;
           width: 22px; height: 22px; border-radius: 6px;
-          background: none; border: none; color: #9CA3AF;
+          background: none; border: none; color: var(--muted, #a8a6c0);
           transition: color .15s, background .15s;
         }
-        .toast-x:hover { color: #16181D; background: rgba(0,0,0,.05); }
+        .toast-x:hover { color: var(--ink, #f5f4ff); background: rgba(127,119,221,.14); }
         @keyframes toastIn { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
         @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
         @media (max-width: 520px) {

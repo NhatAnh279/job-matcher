@@ -27,8 +27,17 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      // Send the login request, then save the returned token
-      const res = await api.post("/api/auth/login", { email, password });
+      // Backend declares these as form fields (Form(...)), so send
+      // url-encoded form data, not JSON. Response shape: { user_id, token }.
+      const res = await api.post("/api/auth/login", new URLSearchParams({ email, password }));
+      // IMPORTANT: the backend returns HTTP 200 even on failure — an { error }
+      // body with no token (e.g. wrong password). So a missing token means the
+      // login failed; never store it or we'd "log in" with a bogus token.
+      if (res.data?.error || !res.data?.token) {
+        localStorage.removeItem("token");
+        setError("Incorrect email or password.");
+        return;
+      }
       localStorage.setItem("token", res.data.token);
       toast("Welcome back");
       // Return to the page that sent us here (e.g. /match), else go to /jobs.
@@ -78,7 +87,7 @@ export function AuthShell({
     <div className="auth-stage">
       <Link href="/" className="auth-brand" aria-label="Job Fit home">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <rect width="28" height="28" rx="8" fill="#16181D" />
+          <rect width="28" height="28" rx="8" fill="#7f77dd" />
           <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
           <circle cx="19.6" cy="9" r="1.9" fill="#fff" />
         </svg>
@@ -93,18 +102,18 @@ export function AuthShell({
       </div>
 
       <style>{`
-        .auth-stage { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 24px; }
+        .auth-stage { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 24px; }
         .auth-brand { display: flex; align-items: center; gap: 10px; }
-        .auth-brand-name { font-family: var(--font-grotesk), sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
-        .auth-card { width: 100%; max-width: 380px; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 20px; padding: 32px; }
-        .auth-title { font-size: 24px; margin: 6px 0 22px; }
+        .auth-brand-name { font-family: var(--font-grotesk), sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -.01em; color: var(--ink); }
+        .auth-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 20px; padding: 32px; box-shadow: var(--shadow-lg); }
+        .auth-title { font-size: 24px; margin: 6px 0 22px; color: var(--ink); }
         .auth-fields { display: flex; flex-direction: column; gap: 16px; }
         .auth-footer { font-size: 14px; text-align: center; margin-top: 22px; }
-        .link { position: relative; color: #2563EB; font-weight: 500; transition: color .15s ease-out; }
-        .link::after { content: ""; position: absolute; left: 0; bottom: -2px; width: 0; height: 2px; background: #2563EB; transition: width .2s ease-out; }
-        .link:hover { color: #1d4ed8; }
+        .link { position: relative; color: var(--accent-bright); font-weight: 500; transition: color .15s ease-out; }
+        .link::after { content: ""; position: absolute; left: 0; bottom: -2px; width: 0; height: 2px; background: var(--accent); transition: width .2s ease-out; }
+        .link:hover { color: #fff; }
         .link:hover::after { width: 100%; }
-        .form-error { font-size: 14px; color: #E11D48; }
+        .form-error { font-size: 14px; color: #fb7185; }
         .form-btn { width: 100%; margin-top: 4px; }
       `}</style>
     </div>
@@ -126,13 +135,14 @@ export function Field({
       />
       <style>{`
         .field { display: flex; flex-direction: column; gap: 6px; }
-        .field-label { font-size: 13px; font-weight: 500; color: #6B7280; }
+        .field-label { font-size: 13px; font-weight: 500; color: var(--muted); }
         .field-input {
-          font-family: inherit; font-size: 15px; padding: 11px 13px;
-          border: 1px solid rgba(0,0,0,.14); border-radius: 10px; background: #fff;
-          transition: border-color .2s;
+          font-family: inherit; font-size: 15px; padding: 11px 13px; color: var(--ink);
+          border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface-2);
+          transition: border-color .2s, box-shadow .2s;
         }
-        .field-input:focus { outline: none; border-color: #16181D; }
+        .field-input::placeholder { color: var(--muted); }
+        .field-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(127,119,221,.18); }
       `}</style>
     </label>
   );

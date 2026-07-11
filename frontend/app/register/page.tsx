@@ -32,9 +32,25 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      // Create the account, then save the token so the user is logged straight in
-      const res = await api.post("/api/auth/register", { name, email, password });
-      localStorage.setItem("token", res.data.token);
+      // Backend declares email/password as form fields (Form(...)) and ignores
+      // any extra field, so send url-encoded form data (name is not used by the
+      // API but harmless). Register returns the raw Supabase sign-up response —
+      // the token, when present, lives under session.access_token.
+      const res = await api.post("/api/auth/register", new URLSearchParams({ name, email, password }));
+      // Backend returns HTTP 200 even on failure — an { error } body (e.g. email
+      // already registered). Surface it instead of pretending the account exists.
+      if (res.data?.error) {
+        setError(String(res.data.error));
+        return;
+      }
+      const token = res.data?.session?.access_token ?? res.data?.token;
+      if (!token) {
+        // Signed up but no session returned (e.g. email confirmation required).
+        toast("Account created. Please log in.");
+        router.push("/login");
+        return;
+      }
+      localStorage.setItem("token", token);
       toast("Account created");
       const next = new URLSearchParams(window.location.search).get("next");
       router.push(next && next.startsWith("/") ? next : "/jobs");

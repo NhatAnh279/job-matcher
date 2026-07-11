@@ -4,10 +4,13 @@
    Fixed behind all content, pointer-events none, very subtle. */
 
 import { motion, useReducedMotion } from "framer-motion";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function ParticleBackground() {
   const reduce = useReducedMotion();
+  // render only after mount — random positions differ between SSR and client
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const dots = useMemo(
     () =>
       Array.from({ length: 14 }, (_, i) => ({
@@ -22,7 +25,7 @@ export default function ParticleBackground() {
     []
   );
 
-  if (reduce) return null;
+  if (reduce || !mounted) return null;
 
   return (
     <div aria-hidden className="particles">
@@ -40,11 +43,11 @@ export default function ParticleBackground() {
       ))}
       <style>{`
         .particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-        .particle { position: absolute; border-radius: 50%; background: #2563eb; opacity: 0.15; will-change: transform; }
-        .orb { position: absolute; border-radius: 50%; filter: blur(64px); opacity: 0.12; will-change: transform; }
-        .orb-1 { width: 360px; height: 360px; background: #93c5fd; top: -90px; left: -70px; animation: orbA 17s ease-in-out infinite; }
-        .orb-2 { width: 320px; height: 320px; background: #c4b5fd; bottom: -100px; right: -60px; animation: orbB 21s ease-in-out infinite; }
-        .orb-3 { width: 280px; height: 280px; background: #a7f3d0; top: 42%; right: 10%; animation: orbA 24s ease-in-out infinite; }
+        .particle { position: absolute; border-radius: 50%; background: #7f77dd; opacity: 0.18; will-change: transform; }
+        .orb { position: absolute; border-radius: 50%; filter: blur(64px); opacity: 0.14; will-change: transform; }
+        .orb-1 { width: 360px; height: 360px; background: #7f77dd; top: -90px; left: -70px; animation: orbA 17s ease-in-out infinite; }
+        .orb-2 { width: 320px; height: 320px; background: #afa9ec; bottom: -100px; right: -60px; animation: orbB 21s ease-in-out infinite; }
+        .orb-3 { width: 280px; height: 280px; background: #6c63c9; top: 42%; right: 10%; animation: orbA 24s ease-in-out infinite; }
         @keyframes orbA { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(34px,22px) scale(1.1); } }
         @keyframes orbB { 0%, 100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-34px,-22px) scale(1.08); } }
       `}</style>

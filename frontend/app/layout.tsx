@@ -3,8 +3,8 @@ import localFont from "next/font/local";
 import "./globals.css";
 import ToastProvider from "./_components/ToastProvider";
 import ParticleBackground from "./_components/ParticleBackground";
-import CursorFollower from "./_components/CursorFollower";
 import ButtonRipple from "./_components/ButtonRipple";
+import ClickBurst from "./_components/ClickBurst";
 
 /* Type pairing — "Scouting Report" direction. Self-hosted (no external <link>):
      --font-grotesk  Clash Display  (display headings, with personality)
@@ -48,8 +48,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ParticleBackground />
         <ToastProvider>{children}</ToastProvider>
-        <CursorFollower />
         <ButtonRipple />
+        <ClickBurst />
       </body>
     </html>
   );
