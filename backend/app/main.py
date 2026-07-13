@@ -11,11 +11,20 @@ from app.ml.extractor import extract_skills
 from app.ml.best_fit import get_best_fit
 from app.ml.extractor import extract_skills, highlight_skills
 from app.ml.matcher import calculate_match, get_shap_scores
+from fastapi.middleware.cors import CORSMiddleware
 
 
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
