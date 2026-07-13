@@ -49,6 +49,14 @@ def scrape_seek(query, location, pages=3):
             jobs.append(job_data)
             print(f"{job_data['title']} | {job_data['company']}")
             time.sleep(1)
+            
+            for job_url in job_urls:
+                try:
+                    page.goto(job_url, timeout=30000)
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except:
+                    print(f"Skipped: {job_url}")
+                    continue
         
         browser.close()
     return jobs
