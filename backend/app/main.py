@@ -20,8 +20,8 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -54,11 +54,16 @@ def get_jobs(q: str = "", location: str = "", source: str = "all"):
     return {"jobs": jobs, "total": len(jobs)}
         
 @app.post("/api/match")
-def match_resume(resume: UploadFile = File(...), job_url: str = Form(...), token: str = Form(...)):
+def match_resume(resume: UploadFile = File(...), job_url: str = Form(...), token: str = Form("")):
     
     # User authentication
-    user = supabase.auth.get_user(token)
-    user_id = user.user.id
+    user_id = None
+    if token:
+        try:
+            user = supabase.auth.get_user(token)
+            user_id = user.user.id
+        except Exception as e:
+            print(f"Auth error: {e}")
     
     # Parse text from resume
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -83,15 +88,16 @@ def match_resume(resume: UploadFile = File(...), job_url: str = Form(...), token
         return {"error": "Job not found"}
         
     result = calculate_match(resume_text, job["description"])
-    result["shap_scores"] = get_shap_scores(resume_text, job["description"])
-    supabase.table("match_history").insert({
-    "user_id": user_id,
-    "job_title": job["title"],
-    "company": job["company"],
-    "score": result["score"],
-    "matched_skills": str(result["matched_skills"]),
-    "missing_skills": str(result["missing_skills"]),
-}).execute()
+    result["shap_scores"] = get_shap_scores(resume_text, job["description"]) 
+    if user_id:
+            supabase.table("match_history").insert({
+                "user_id": user_id,
+                "job_title": job["title"],
+                "company": job["company"],
+                "score": result["score"],
+                "matched_skills": str(result["matched_skills"]),
+                "missing_skills": str(result["missing_skills"]),
+            }).execute()
     return result
 
 # Register        
