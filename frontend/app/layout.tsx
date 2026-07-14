@@ -38,7 +38,7 @@ const mono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Job Fit",
+  title: "Job Match",
   description: "Match your resume to live job listings and see exactly where you fit.",
 };
 

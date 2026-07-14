@@ -172,7 +172,8 @@ export default function InsightsPage() {
 
         .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
         .field { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface); transition: border-color .2s, box-shadow .2s; }
-        .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(127,119,221,.18); }
+        .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(127,119,221,.14); }
+        .inp:focus, .inp:focus-visible { outline: none; }
         .ic { color: var(--muted); }
         .inp { flex: 1; border: none; outline: none; font-family: var(--font-sans), sans-serif; font-size: 15px; padding: 12px 0; background: transparent; color: var(--ink); }
         .inp::placeholder { color: var(--muted); }

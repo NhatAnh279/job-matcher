@@ -103,7 +103,7 @@ function HeroPanel({ active, reduced }: PanelProps) {
         </Reveal>
         <Reveal show={active} delay={80}>
           <h1 className="hero-title">
-            Find the job you actually <span className="hero-fit">fit.</span>
+            Find the job you actually <span className="hero-fit">match.</span>
           </h1>
         </Reveal>
         <Reveal show={active} delay={150}>
@@ -472,7 +472,7 @@ export default function LandingPage() {
               <circle cx="19.6" cy="9" r="1.9" fill="#FFFFFF" />
             </svg>
           </span>
-          <span className="brand-name">Job Fit</span>
+          <span className="brand-name">Job Match</span>
         </button>
 
         {/* Behavior 3+5: nav links (Jobs…History) */}

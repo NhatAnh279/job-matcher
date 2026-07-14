@@ -66,7 +66,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       eyebrow="Welcome back"
-      title="Log in to Job Fit"
+      title="Log in to Job Match"
       footer={<>New here? <Link href="/register" className="link">Create an account</Link></>}
     >
       <Field label="Email" type="email" value={email} placeholder="you@email.com" onChange={setEmail} />
@@ -85,13 +85,13 @@ export function AuthShell({
 }: { eyebrow: string; title: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
     <div className="auth-stage">
-      <Link href="/" className="auth-brand" aria-label="Job Fit home">
+      <Link href="/" className="auth-brand" aria-label="Job Match home">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
           <rect width="28" height="28" rx="8" fill="#7f77dd" />
           <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
           <circle cx="19.6" cy="9" r="1.9" fill="#fff" />
         </svg>
-        <span className="auth-brand-name">Job Fit</span>
+        <span className="auth-brand-name">Job Match</span>
       </Link>
 
       <div className="auth-card">

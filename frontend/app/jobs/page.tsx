@@ -14,7 +14,7 @@ import { useRequireAuth } from "../_components/useRequireAuth";
    1. CONFIG + MOCK DATA
    ════════════════════════════════════════════════════════════════ */
 const ACCENT = "#7f77dd"; // one purple accent, matches the landing
-const SLOGAN = "Find the job you actually fit…";
+const SLOGAN = "Find the job you actually match…";
 
 const ROLE_SUGGESTIONS = ["Data Scientist", "Data Analyst", "ML Engineer", "BI Analyst", "Python", "SQL", "Power BI"];
 const LOC_SUGGESTIONS = ["Sydney NSW", "Melbourne VIC", "Brisbane QLD", "Remote"];
@@ -310,12 +310,18 @@ export default function JobsPage() {
     setSelectedFields(next);
   }
 
-  const kwSuggestions = ROLE_SUGGESTIONS.filter(
-    (s) => s.toLowerCase().includes(keyword.toLowerCase()) && s.toLowerCase() !== keyword.toLowerCase()
-  );
-  const locSuggestions = LOC_SUGGESTIONS.filter(
-    (s) => s.toLowerCase().includes(location.toLowerCase()) && s.toLowerCase() !== location.toLowerCase()
-  );
+  // Suggestions appear only once the user starts typing — a bare click on the
+  // field must not pop an extra panel over the page.
+  const kwSuggestions = keyword.trim()
+    ? ROLE_SUGGESTIONS.filter(
+        (s) => s.toLowerCase().includes(keyword.toLowerCase()) && s.toLowerCase() !== keyword.toLowerCase()
+      )
+    : [];
+  const locSuggestions = location.trim()
+    ? LOC_SUGGESTIONS.filter(
+        (s) => s.toLowerCase().includes(location.toLowerCase()) && s.toLowerCase() !== location.toLowerCase()
+      )
+    : [];
 
   function toggle(set: Set<string>, id: string, update: (s: Set<string>) => void) {
     const next = new Set(set);
@@ -337,7 +343,15 @@ export default function JobsPage() {
             <MagnifyingGlass className="ic" size={18} />
             <input
               className="inp"
-              autoComplete="off"
+              /* "one-time-code" is a valid token with no stored data, so the
+                 browser's own autofill dropdown (which ignores "off" for
+                 address-looking fields) never appears over our suggestions. */
+              autoComplete="one-time-code"
+              autoCorrect="off"
+              spellCheck={false}
+              role="combobox"
+              aria-expanded={focus === "kw" && kwSuggestions.length > 0}
+              aria-autocomplete="list"
               placeholder={typed}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
@@ -361,7 +375,15 @@ export default function JobsPage() {
             <MapPin className="ic" size={18} />
             <input
               className="inp"
-              autoComplete="off"
+              /* The "Suburb, city, or region" placeholder makes Chrome treat
+                 this as an address field and pop its own autofill list even
+                 with autocomplete="off" — "one-time-code" suppresses it. */
+              autoComplete="one-time-code"
+              autoCorrect="off"
+              spellCheck={false}
+              role="combobox"
+              aria-expanded={focus === "loc" && locSuggestions.length > 0}
+              aria-autocomplete="list"
               placeholder="Suburb, city, or region"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -575,10 +597,16 @@ export default function JobsPage() {
         .band, .wrap { font-family: var(--font-sans), sans-serif; }
 
         /* ── search band ── */
-        .band { background: rgba(20,19,28,.6); border-bottom: 1px solid var(--hairline); backdrop-filter: blur(8px); }
+        /* backdrop-filter makes .band its own stacking context, so it needs an
+           explicit z-index or the suggestion panels get painted UNDER the
+           category icons / sticky columns that come later in the DOM. */
+        .band { position: relative; z-index: 10; background: rgba(20,19,28,.6); border-bottom: 1px solid var(--hairline); backdrop-filter: blur(8px); }
         .band-inner { max-width: 1100px; margin: 0 auto; padding: 20px 24px; display: flex; gap: 12px; flex-wrap: wrap; }
         .field { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface); transition: border-color .2s, box-shadow .2s; }
-        .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(127,119,221,.18); }
+        .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(127,119,221,.14); }
+        /* the wrapper .field shows focus; kill the input's own outline so we
+           don't get a second bright frame inside (overrides globals.css). */
+        .inp:focus, .inp:focus-visible { outline: none; }
         .ic { color: var(--muted); font-size: 18px; }
         .ic-sm { color: var(--muted); font-size: 14px; margin-right: 8px; }
         .inp { flex: 1; border: none; outline: none; font-family: var(--font-sans), sans-serif; font-size: 15px; padding: 12px 0; background: transparent; color: var(--ink); }
@@ -586,8 +614,14 @@ export default function JobsPage() {
         .search-btn { background: var(--accent); color: #fff; font-family: var(--font-sans), sans-serif; font-weight: 600; font-size: 15px; border: none; border-radius: 10px; padding: 0 28px; transition: transform .15s, box-shadow .2s, background .2s; }
         .search-btn:hover { transform: translateY(-1px) scale(1.02); background: #938ce4; box-shadow: 0 6px 18px rgba(127,119,221,.4); }
 
-        /* suggestions */
-        .sugg { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: var(--shadow-md); padding: 6px; z-index: 30; animation: pop .14s ease; }
+        /* suggestions — one clean panel attached right under the field */
+        .sugg {
+          position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+          background: var(--surface-2); border: 1px solid var(--accent-line);
+          border-radius: 12px; box-shadow: var(--shadow-lg);
+          padding: 6px; z-index: 50; max-height: 240px; overflow-y: auto;
+          animation: pop .14s ease;
+        }
         .sugg-opt { display: flex; align-items: center; width: 100%; text-align: left; font-size: 14px; padding: 9px 10px; border: none; background: none; border-radius: 8px; color: var(--ink); transition: background .15s; }
         .sugg-opt:hover { background: rgba(127,119,221,.14); }
         @keyframes pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

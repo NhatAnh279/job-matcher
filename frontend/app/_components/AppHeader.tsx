@@ -29,13 +29,13 @@ export default function AppHeader({ active }: { active?: string }) {
     <header className="app-header">
       {/* Logged-in home is the app, not the marketing landing — going to "/"
           shows the logged-out-looking cover and reads as an accidental logout. */}
-      <Link href="/jobs" className="brand" aria-label="Job Fit home">
+      <Link href="/jobs" className="brand" aria-label="Job Match home">
         <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
           <rect width="28" height="28" rx="8" fill="#7f77dd" />
           <path d="M7.4 14.3 L11.2 18 L16 8.8" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
           <circle cx="19.6" cy="9" r="1.9" fill="#FFFFFF" />
         </svg>
-        <span className="brand-name">Job Fit</span>
+        <span className="brand-name">Job Match</span>
       </Link>
 
       <nav className="app-links">
