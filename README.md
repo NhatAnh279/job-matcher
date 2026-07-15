@@ -1,6 +1,13 @@
 # Job Matcher — Resume-to-Job Matching Platform
 
-A backend + ML web application that scrapes live job listings from Seek and Jora, then matches them against user resumes using SBERT semantic similarity and keyword extraction across 16 industries.
+## Team
+
+| Role | Name |
+|------|------|
+| Backend + ML | Nhat Anh Nguyen |
+| Frontend | Linh Bui |
+
+A full-stack web application that scrapes live job listings from Seek and Jora, then matches them against user resumes using SBERT semantic similarity and keyword extraction across 16 industries.
 
 Users can upload their resume to:
 - See how well they match specific jobs with explainable scoring
@@ -12,29 +19,37 @@ Users can upload their resume to:
 
 **Backend:** FastAPI REST API with 9 endpoints, Supabase authentication, PostgreSQL database, and automated job scraping using BeautifulSoup and Playwright.
 
-**Deployment:** Dockerised and deployed on HuggingFace Spaces. SBERT model pre-downloaded during build to optimise container startup time within free-tier resource constraints.
+**Frontend:** Next.js + Tailwind CSS — responsive web app with job search, resume matching dashboard, skill gap analysis, and match history.
+
+**Deployment:** Backend Dockerised and deployed on HuggingFace Spaces. SBERT model pre-downloaded during build to optimise container startup time within free-tier resource constraints.
 
 **Acknowledgement:** AI tools (Claude) were used for guided learning, debugging support, and code review throughout development. All code was written and understood by the developer.
+
+---
 
 ## Live Demo
 
 - **API Documentation:** [Swagger UI](https://tommy279-job-matcher.hf.space/docs)
 - **Demo Video:** [Watch on Google Drive](https://drive.google.com/drive/folders/14FbVvxqURWz2tO79SQyv6DPQrGHJq5DF?usp=sharing)
-- **Frontend:** [Coming soon — deploy in progress]
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Language | Python |
+| Language | Python, TypeScript |
 | API Framework | FastAPI |
+| Frontend | Next.js, React, Tailwind CSS |
 | ML/NLP | SBERT (sentence-transformers), scikit-learn, KMeans |
 | Scraping | BeautifulSoup, Playwright |
 | Database | PostgreSQL (Supabase) |
 | Auth | Supabase Auth (JWT) |
 | Resume Parsing | pdfminer.six |
-| Deployment | Docker, HuggingFace Spaces |
+| Deployment | Docker, HuggingFace Spaces, Vercel |
 | Version Control | Git, GitHub |
+
+---
 
 ## Features
 
@@ -52,6 +67,8 @@ Users can upload their resume to:
 
 - **Authentication** — Secure register and login system with Supabase Auth
 
+---
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
@@ -66,6 +83,8 @@ Users can upload their resume to:
 | GET | `/api/best-fit` | Best-fit role based on resume |
 | GET | `/api/jd-highlight` | Job description with skills highlighted |
 
+---
+
 ## Architecture
 
 ```mermaid
@@ -74,60 +93,76 @@ graph TB
         A[Browser]
     end
 
-    subgraph Backend [FastAPI Server]
-        B[API Endpoints]
-        C[Resume Parser]
-        D[SBERT Matching]
-        E[Keyword Extraction]
-        F[KMeans Clustering]
-        G[SHAP Explainability]
+    subgraph Frontend [Next.js - Vercel]
+        B[Job Search Page]
+        C[Match Dashboard]
+        D[Insights Page]
+        E[History Page]
+    end
+
+    subgraph Backend [FastAPI - HuggingFace Spaces]
+        F[API Endpoints]
+        G[Resume Parser]
+        H[SBERT Matching]
+        I[Keyword Extraction]
+        J[KMeans Clustering]
+        K[SHAP Explainability]
     end
 
     subgraph Data
-        H[Supabase PostgreSQL]
-        I[Supabase Auth]
-        J[jobs.json]
+        L[Supabase PostgreSQL]
+        M[Supabase Auth]
+        N[jobs.json]
     end
 
     subgraph Scrapers [Run Locally]
-        K[Jora - BeautifulSoup]
-        L[Seek - Playwright]
+        O[Jora - BeautifulSoup]
+        P[Seek - Playwright]
     end
 
-    A -->|API requests| B
-    B --> C
-    B --> D
-    B --> E
-    B --> F
-    B --> G
-    B -->|Auth| I
-    B -->|Match history| H
-    B -->|Job data| J
-    K -->|Scrape| J
-    L -->|Scrape| J
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+    B -->|GET /api/jobs| F
+    C -->|POST /api/match| F
+    D -->|GET /api/market-demand| F
+    E -->|GET /api/match/history| F
+    F --> G
+    F --> H
+    F --> I
+    F --> J
+    F --> K
+    F -->|Auth| M
+    F -->|Match history| L
+    F -->|Job data| N
+    O -->|Scrape| N
+    P -->|Scrape| N
 ```
+
+---
 
 ## How to Run Locally
 
-**Prerequisites:** Python 3.14+, Git
+**Prerequisites:** Python 3.14+, Node.js 18+, Git
 
 **1. Clone the repo:**
 ```bash
 git clone https://github.com/NhatAnh279/job-matcher.git
-cd job-matcher/backend
 ```
 
-**2. Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-**3. Set up environment variables:**
+**2. Set up environment variables:**
 
 Create a `.env` file in `backend/`:
 ```
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_anon_key
+```
+
+**3. Install backend dependencies:**
+```bash
+cd job-matcher/backend
+pip install -r requirements.txt
 ```
 
 **4. Run the backend:**
@@ -137,7 +172,7 @@ uvicorn app.main:app --reload
 
 **5. Run the frontend (separate terminal):**
 ```bash
-cd ../frontend
+cd job-matcher/frontend
 npm install
 npm run dev
 ```
@@ -146,26 +181,36 @@ npm run dev
 - Frontend: `http://localhost:3000`
 - API Docs: `http://localhost:8000/docs`
 
+---
+
 ## Project Structure
 
 ```
-backend/
-├── app/
-│   ├── main.py                  # FastAPI server + endpoints
-│   ├── api/
-│   │   └── auth.py              # Supabase authentication
-│   ├── ml/
-│   │   ├── extractor.py         # Skills dictionary + keyword extraction
-│   │   ├── matcher.py           # SBERT matching + SHAP explainability
-│   │   ├── best_fit.py          # KMeans clustering for role recommendation
-│   │   └── resume_parser.py     # PDF text extraction
-│   ├── scraper/
-│   │   ├── jora.py              # Jora scraper (BeautifulSoup)
-│   │   ├── seek.py              # Seek scraper (Playwright)
-│   │   └── run_scraper.py       # Combined scraper runner
-│   └── data/
-│       └── jobs.json            # Scraped job listings
-├── requirements.txt
-├── Dockerfile
-└── .env                         # Environment variables (not in repo)
+job-matcher/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                  # FastAPI server + endpoints
+│   │   ├── api/
+│   │   │   └── auth.py              # Supabase authentication
+│   │   ├── ml/
+│   │   │   ├── extractor.py         # Skills dictionary + keyword extraction
+│   │   │   ├── matcher.py           # SBERT matching + SHAP explainability
+│   │   │   ├── best_fit.py          # KMeans clustering for role recommendation
+│   │   │   └── resume_parser.py     # PDF text extraction
+│   │   ├── scraper/
+│   │   │   ├── jora.py              # Jora scraper (BeautifulSoup)
+│   │   │   ├── seek.py              # Seek scraper (Playwright)
+│   │   │   └── run_scraper.py       # Combined scraper runner
+│   │   └── data/
+│   │       └── jobs.json            # Scraped job listings
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── .env                         # Environment variables (not in repo)
+├── frontend/
+│   ├── app/                         # Next.js app directory
+│   ├── lib/
+│   │   └── api.ts                   # API client
+│   ├── package.json
+│   └── .env.local                   # Frontend environment variables
+└── README.md
 ```
