@@ -1,4 +1,4 @@
-# Job Match — Resume-to-Job Matching Platform
+# Job Matcher — Resume-to-Job Matching Platform
 
 ## Team
 
