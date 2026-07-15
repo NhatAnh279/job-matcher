@@ -19,7 +19,8 @@ Users can upload their resume to:
 ## Live Demo
 
 - **API Documentation:** [Swagger UI](https://tommy279-job-matcher.hf.space/docs)
-- **Frontend:** In development
+- **Demo Video:** [Watch on Google Drive](https://drive.google.com/drive/folders/14FbVvxqURWz2tO79SQyv6DPQrGHJq5DF?usp=sharing)
+- **Frontend:** [Coming soon — deploy in progress]
 
 ## Tech Stack
 
@@ -129,14 +130,21 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_anon_key
 ```
 
-**4. Run the server:**
+**4. Run the backend:**
 ```bash
 uvicorn app.main:app --reload
 ```
 
-**5. Open Swagger UI:**
+**5. Run the frontend (separate terminal):**
+```bash
+cd ../frontend
+npm install
+npm run dev
+```
 
-Visit `http://localhost:8000/docs`
+**6. Open the app:**
+- Frontend: `http://localhost:3000`
+- API Docs: `http://localhost:8000/docs`
 
 ## Project Structure
 
